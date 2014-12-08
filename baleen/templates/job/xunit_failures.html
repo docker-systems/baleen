@@ -1,0 +1,7 @@
+<div class="row">
+<div class="span9">
+<ul>
+{% for cls, test_name, message, details in failure %}
+    <li>{{ cls }}.{{ test_name }} - <span style="color: red">{{ message }}</span><pre>{{ details }}</pre></li>
+{% endfor %}
+</ul></div></div>

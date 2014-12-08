@@ -1,0 +1,37 @@
+{% extends 'base.jinja2' %}
+{%- block title %}
+<title>Users | baleen</title>
+{%- endblock %}
+{% block content %}
+<h1>Users</h1>
+
+{% if users %}
+<div class="span11">
+<table class="table table-striped">
+    <thead>
+        <th>Username</th>
+        <th>Email address</th>
+        <th>Last login</th>
+        <th>Last access</th>
+        <th></th>
+        <th></th>
+    </thead>
+    <tbody>
+{% for user in users %}
+        <tr>
+            <td><a href="/user/{{ user._id }}/update">{{ user.username }}</a></td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.last_login|default('Never', true)}}</td>
+            <td>{{ user.last_access|default('Never', true)}}</td>
+            <td><a href="/user/{{ user._id }}/update">Edit</a> </td>
+            <td><a href="/user/{{ user._id }}/delete">Delete</a> </td>
+        </tr>
+{% endfor %}
+    </tbody>
+</table>
+</div>
+<button class="btn btn-small" onclick="location='/user/add'">Add new user</button>
+
+{% endif %}
+{% endblock %}
+

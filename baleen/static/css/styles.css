@@ -1,0 +1,27 @@
+span.label   {
+  width: 100%;
+  text-align: center;
+}
+
+span.failure { color: red; }
+span.success { color: green; }
+div.details-toggle { cursor: pointer; }
+
+pre { 
+  font-family: Consolas, monaco, monospace;
+  color: white;
+  background-color: black;
+}
+pre.stdout, pre.stderr { 
+  height: auto;
+  max-height: 400px;
+  overflow: auto;
+  word-break: normal !important;
+  /*word-wrap: normal !important;*/
+  /*white-space: pre !important;*/
+}
+
+a.githash { 
+  font-family: Consolas, monaco, monospace;
+  text-shadow: 0 2px rgba(255, 255, 255, 0.8);
+}

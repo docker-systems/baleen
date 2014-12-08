@@ -1,0 +1,45 @@
+{% load job_extras %}
+<table id="recent-jobs" class="table table-striped">
+    <thead>
+        <tr>
+            <th>Started</th>
+            <th>Result</th>
+            <th>Duration</th>
+            <th>Tests</th>
+            <th>Coverage</th>
+            <th>Who</th>
+            <th>What</th>
+        </tr>
+    </thead>
+    <tbody>
+{% for job in jobs %}
+{% if job != current_job %}
+        <tr>
+            {% if not job.started_at %}
+                <td>-</td>
+                <td>{{ job|job_status_badge }}</td>
+                <td>-</td>
+            {% else %}
+                <td class="time-age" data-time="{{ job.started_at|date:"c" }}"></td>
+                <td>
+                    {{ job|job_status_badge }}
+                </td>
+                <td><a href="{% url 'view_job' project_id=project.id job_id=job.id %}" class="time-diff" data-start="{{ job.started_at|date:"c" }}" {% if job.finished_at %}data-end="{{ job.finished_at|date:"c" }}"{% endif %}></a></td>
+            {% endif %}
+            <td>
+                {% render_xunit_summary job.test_action_result %}
+            </td>
+            <td>
+                {% render_coverage job.test_action_result %}
+            </td>
+            <td>
+                {{ job|render_initiating_user }}
+            </td>
+            <td>
+                {{ job|render_trigger }}
+            </td>
+        </tr>
+{% endif %}
+{% endfor %}
+    </tbody>
+</table>

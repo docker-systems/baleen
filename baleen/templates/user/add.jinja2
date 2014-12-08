@@ -1,0 +1,44 @@
+{% extends 'base.jinja2' %}
+{%- block title %}
+<title>Add User | baleen</title>
+{%- endblock %}
+{% block content %}
+<h1>Add User</h1>
+{% if error %}
+<div class="alert alert-error"><strong>Error:</strong> {{ error }}</div>
+{% endif %}
+
+<form action="" method="post" class="form-horizontal">
+  <div class="control-group">
+    <label class="control-label" for="id_username">User name</label>
+    <div class="controls">
+      <input type="text" class="span3" id="id_username" name="username" {% if username is defined %}value="{{ username.0 }}"{%endif %}>
+    </div>
+  </div>
+  <div class="control-group">
+    <label class="control-label" for="id_password">Password</label>
+    <div class="controls">
+      <input type="password" id="id_password" class="span3" name="password">
+    </div>
+  </div>
+  <div class="control-group">
+    <label class="control-label" for="id_password2">Confirm password</label>
+    <div class="controls">
+      <input id="id_password2" type="password" class="span3" name="password2">
+    </div>
+  </div>
+  <div class="control-group">
+    <label class="control-label" for="id_email">Email address</label>
+    <div class="controls">
+      <input id="id_email" type="text" class="span3" name="email" {% if email is defined %}value="{{ email.0 }}{% endif %}">
+    </div>
+  </div>
+  <div class="control-group">
+    <div class="controls">
+      <button type="submit" class="btn btn-primary">Add User</button>
+      <button type="button" onClick="location='../users'" class="btn">Cancel</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+

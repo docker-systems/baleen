@@ -1,0 +1,56 @@
+{% extends 'base.jinja2' %}
+{% block content %}
+<h1>{{ g.project.name }}</h1>
+
+<form action="" method="post">
+    <div class="control-group">
+        <label>Project Name</label>
+        <input type="text" class="span3" name="name" value="{{ g.project.name }}">
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">Update Project</button>
+    </div>
+</form>
+
+<h2>Actions</h2>
+
+<table id="actions" class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Command</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+    <tfoot>
+</tfoot>
+</table>
+
+<script type="text/template" id="action-edit-tpl">
+    <td colspan="3">
+        <form class="form-inline edit-form">
+            <div class="control-group">
+                <label>Name</label>
+                <input type="text" class="span3" name="name" value="<%= name %>">
+                <label>Command</label>
+                <input type="text" class="input-mini" name="username" placeholder="user" value="<%= username %>">
+                @
+                <input type="text" class="input-small" name="host" placeholder="host" value="<%= host %>">
+                :
+                <input type="text" class="input-medium" name="command" placeholder="command" value="<%= command %>">
+                <button class="btn">Save</button>
+            </div>
+        </form>
+    </td>
+</script>
+<script type="text/template" id="action-view-tpl">
+    <td><%= name %></td>
+    <td><%= username %>@<%= host %>: <%= command %></td>
+    <td><button class="btn edit">Edit</button> <button class="btn btn-danger delete">&times;</button></td>
+</script>
+<script>
+    var action_data = {{ g.project.actions()|tojson|safe }};
+</script>
+{% endblock %}

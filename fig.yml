@@ -1,0 +1,11 @@
+web:
+  build: .
+  links:
+   - db
+  ports:
+   - "8000:8000"
+   - "9001:9001"
+  volumes:
+   - /usr/local/d8o/baleen:/usr/local/baleen
+db:
+  image: postgres

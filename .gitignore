@@ -1,0 +1,11 @@
+*.swp
+*.swo
+*.un~
+*.pyc
+
+logs/*
+local_settings.py
+supervisorctl.conf
+htmlcov/*
+.coverage
+nosetests.xml

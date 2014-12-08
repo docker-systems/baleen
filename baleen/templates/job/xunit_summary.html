@@ -1,0 +1,7 @@
+{% if total %}
+{% if success != total %}
+<span style="color: red; white-space: nowrap">{{ success }} / {{ total }}</span>
+{% else %}
+<span style="white-space: nowrap">{{ success }} / {{ total }}</span>
+{% endif %}
+{% endif %}

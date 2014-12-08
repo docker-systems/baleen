@@ -1,0 +1,14 @@
+{% extends 'base.jinja2' %}
+{% block content %}
+<h1><a href="{{ url_for('.show', id = g.project._id) }}">{{ g.project.name }}</a></h1>
+<h5>STDOUT</h5>
+<div id="action-out-container"><pre id="action-out">{{ outdata }}</pre></div>
+<h5>STDERR</h5>
+<div id="action-err-container"><pre id="action-err">{{ errdata }}</pre></div>
+<script>
+    setInterval(function() {
+        $('#action-out-container').load(location.href + ' #action-out');
+        $('#action-err-container').load(location.href + ' #action-err');
+    }, 5000);
+</script>
+{% endblock %}

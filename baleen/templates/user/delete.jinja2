@@ -1,0 +1,22 @@
+{% extends 'base.jinja2' %}
+{%- block title %}
+<title>Delete User | baleen</title>
+{%- endblock %}
+{% block content %}
+<h1>Delete  user {{ g.user.username }}?</h1>
+
+<form action="" method="post">
+
+    </br>
+
+    <div class="control-group">
+      <div class="controls">
+        <button type="submit" class="btn btn-primary" name='delete' value='delete'>Delete</button>
+        <button type="button" class="btn" onClick="location='../../users'">Cancel</button>
+      </div>
+    </div>
+</form>
+{% endblock %}
+
+
+

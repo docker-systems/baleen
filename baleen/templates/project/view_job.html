@@ -1,0 +1,122 @@
+{% extends 'base.jinja2' %}
+{% load job_extras %}
+{% block title %}
+<title>{{ project.name }} job details | baleen</title>
+{% endblock %}
+{% block content %}
+    {% if job.started_at and not job.finished_at %}
+    <div class="span3 pull-right">
+        <a class="btn btn-danger btn-large" href="{% url 'mark_job_done' project_id=project.id job_id=job.id %}"><i class="icon-white icon-fire"></i> TERMINATE JOB</a>
+    </div>
+    {% endif %}
+    <h1><a href="{% url 'show_project' project_id=project.id %}">{{ project.name }}</a></h1>
+    <h2> Job {{ job.id }} - <span class="time-age" data-time="{{ job.received_at|date:"c" }}"></span> -
+    {% if job.done %}
+        {% if job.success %}Success!{% elif job.rejected %}Rejected{% else %}<span class="failure">Failed :-(<span>{% endif %}
+    {% elif job.started_at and not job.done %}
+        In Progress
+    {% else %}
+        Queued
+    {% endif %}
+    </h2>
+    <p class="summary">
+        {% if job.started_at %}
+        Started <span class="time-age" data-time="{{ job.started_at|date:"c" }}"></span>
+        {% endif %}
+        {% if job.finished_at %}
+        , took <span class="time-diff" data-start="{{ job.started_at|date:"c" }}" data-end="{{ job.finished_at|date:"c" }}"></span>
+        {% endif %}
+    <p>
+
+    {% if github_data %}
+    <ul class="well">
+    {% for commit in github_data.commits %}
+        <li><a class="githash" href="{{ commit.url }}">{{ commit.id }}</a> - "{{ commit.message }}" by {{ commit.author.name }} at <span class="time" data-time="{{ commit.timestamp }}"></span></li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+
+    <p>Triggered by {{ job|render_initiating_user }}</p>
+
+    {% if job.rejected %}
+    <p class="text-error">Rejected. An earlier job for this project was still running at the time this job was received.</p>
+    {% endif %}
+
+    <h3>Test Summary</h3>
+    <div>{% render_xunit_summary job.test_action_result %}</div>
+
+    <h3>Test Coverage</h3>
+    <div>{% render_coverage job.test_action_result %}</div>
+
+    <h3>Actions</h2>
+    {% for action_result in job.ordered_actions reversed %}
+    <div class="row">
+        <div class="details-toggle span12">
+            <h4>
+            {% if action_result.in_progress %}<span class="inprogress">&#x231b;</a>
+            {% elif action_result.success %}<span class="success">&#x2714;</a>
+            {% else %}<span class="failure">&#x2718;</a>
+            {% endif %}
+            {{ action_result.action.index }}. {{ action_result.action.name }}<span style="display: none" class="updown"> +</span></h4>
+        </div>
+        <div {% if action_result.success %}style="display: none"{% endif %} class="span11 well details">
+            <div class="tabbable tabs-left">
+                <ul class="nav nav-tabs">
+                    {% if not action_result.in_progress %}
+                    <li class="active"><a href="#action{{action_result.action.index}}-tab1" data-toggle="tab">Summary</a></li>
+                    {% endif %}
+                    {% if action_result.in_progress or action_result.stdout %}
+                    <li {% if action_result.in_progress %}class="active"{% endif %}><a href="#action{{action_result.action.index}}-tab2" data-toggle="tab">stdout</a></li>
+                    {% endif %}
+                    {% if action_result.in_progress or action_result.stderr %}
+                    <li><a href="#action{{action_result.action.index}}-tab3" data-toggle="tab">stderr</a></li>
+                    {% endif %}
+                </ul>
+                <div class="tab-content">
+                    {% if not action_result.in_progress %}
+                    <div class="tab-pane active" id="action{{action_result.action.index}}-tab1">
+                        <p>As <code>{{ action_result.action.username }}</code>@<code>{{ action_result.action.host }}</code> run <code>{{ action_result.action.command }}</code></p>
+                        <p> {% if not action_result.status_code %}<span class="">Exited with return code {{ action_result.status_code }}.<span>
+                            {% else %}<span class="failure">Exited with<span>
+                            {% endif %}
+                        {% if action_result.status_code %} return code <strong>{{ action_result.status_code }}</strong>, {% endif %}
+                        {% if action_result.message %} message: <pre>{{ action_result.message }}</pre> {% endif %}
+                        </p>
+                        {% if action_result.has_output %} 
+                            <div>{% render_coverage action_result %}</div>
+                            <div>{% render_xunit_summary action_result %}</div>
+                            <div>{% render_xunit_failures action_result %}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if action_result.stdout %}
+                        <div class="tab-pane {% if action_result.in_progress %}active{% endif %}" id="action{{action_result.action.index}}-tab2">
+                            <pre class="stdout">{{ action_result.stdout.output }}</pre>
+                        </div>
+                    {% endif %}
+                    {% if action_result.stderr %}
+                        <div class="tab-pane" id="action{{action_result.action.index}}-tab3">
+                            <pre class="stderr">{{ action_result.stderr.output }}</pre>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% endblock %}
+
+{% block script %}
+<script>
+    $('.details-toggle').click(function() {
+        var div_details = $(this).closest('div.row').find('div.details');
+        div_details.slideToggle('fast');
+        return false;
+    });
+
+    $('.failures-toggle').click(function() {
+        $(this).closest('div').next().slideToggle('fast');
+        return false;
+    });
+</script>
+{% endblock %}

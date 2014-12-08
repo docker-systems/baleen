@@ -1,0 +1,75 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+{% load account %}
+{% load url from future %}
+
+{% block head_title %}{% trans "Login" %}{% endblock %}
+
+
+{% block content %}
+    
+{% if not user.is_authenticated %}
+
+{% if socialaccount.providers  %}
+<p>{% blocktrans with site.name as site_name %}Please sign in with one
+of your existing third party accounts. Or, <a 
+href="{{ signup_url }}">sign up</a> for a {{site_name}} account and sign in
+below:{% endblocktrans %}</p>
+
+<div class="socialaccount_ballot">
+
+<ul class="socialaccount_providers">
+{% include "socialaccount/snippets/provider_list.html" %}
+</ul>
+
+<div class="login-or">{% trans 'or' %}</div>
+
+</div>
+
+{% include "socialaccount/snippets/login_extra.html" %}
+
+{% endif %}
+{% endif %}
+
+<form class="form-horizontal login" method="POST" action="{% url 'account_login' %}">
+    <fieldset>
+    <legend>Login</legend>
+    {% csrf_token %}
+    <div class="control-group">
+        <label class="control-label" for="{{ form.login.auto_id }}">User name</label>
+        <div class="controls">
+            {{ form.login }}
+        </div>
+    </div>
+    <div class="control-group">
+        <label class="control-label" for="{{ form.password.auto_id }}">Password</label>
+        <div class="controls">
+            {{ form.password }}
+            <a class="button secondaryAction" href="{% url 'account_reset_password' %}">{% trans "Forgot Password?" %}</a>
+        </div>
+    </div>
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
+                {{ form.remember }} Remember me
+            </label>
+        </div>
+    </div>
+    {% if redirect_field_value %}
+    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+    {% endif %}
+    <div class="control-group">
+        <div class="controls">
+            <button class="btn btn-primary" type="submit">{% trans "Sign In" %}</button>
+        </div>
+    </div>
+</form>
+    
+{% if user.is_authenticated %}
+{% include "account/snippets/already_logged_in.html" %}
+{% endif %}
+    
+
+{% endblock %}
+

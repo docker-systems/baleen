@@ -1,0 +1,27 @@
+django>=1.5,<1.7
+psycopg2
+south
+jsonfield
+django-reversion
+django-jsonify
+django-crispy-forms
+pygments
+django-allauth
+django-sendfile
+requests
+
+gearman
+paramiko
+supervisor
+python-statsd
+
+# For migration from old deployhub
+pymongo
+
+django-nose
+mock
+coverage
+
+pip>=1.4
+wheel
+watchdog

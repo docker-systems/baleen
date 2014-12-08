@@ -1,0 +1,12 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+
+{% block extrahead %}
+<meta http-equiv="refresh" content="2; URL=/">
+{% endblock extrahead %}
+{% block head_title %}{% trans "Logged out" %}{% endblock %}
+
+{% block content %}
+<p>{% trans "You have logged out and will be redirected to the home page." %}</p>
+{% endblock %}

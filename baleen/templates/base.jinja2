@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+{% load staticfiles %}
+<html>
+    <head>
+       <meta charset="utf-8">
+        {% block title %}
+        <title>baleen</title>
+        {% endblock %}
+        {% for css in static.css %}
+        <link rel="stylesheet" href="{% static css %}">
+        {% endfor %}
+        <style>
+            body {
+                padding-top: 60px
+            }
+        </style>
+    </head>
+    <body>
+        <div class="navbar navbar-inverse navbar-fixed-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="brand" href="/">baleen</a>
+{% if user.is_authenticated %}
+                    <ul id="primary-nav" class="nav">
+                        <li>
+                        <a href="{% url 'add_project' %}">Add Project</a>
+                        </li>
+{% if user.is_staff %}
+                        <li>
+                        <a href="{% url 'admin:index' %}">Admin</a>
+                        </li>
+{% endif %}
+                        <li>
+                        <form style="display: none;" id="logout" method="post" action="{% url 'account_logout' %}" encrypt="multipart/form-data">{% csrf_token %}</form>
+                        <a href="javascript:;" onclick="document.getElementById('logout').submit();">Log off</a>
+                        </li>
+                    </ul>
+{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="container">
+{% with messages as get_flashed_message %}
+        <div class="messages">
+    {% if messages %}
+        <div class="flash alert alert-info">
+        {% for message in messages %}
+            {{ message }}
+        {% endfor %}
+        </div>
+    {% endif %}
+        </div>
+{% endwith %}
+        {% block content %}{% endblock %}
+        {% for js in static.js %}
+        <script src="{% static js %}"></script>
+        {% endfor %}
+        <script>
+            setTimeout(function() {
+                $('.flash').slideUp();
+            }, 5000);
+        </script>
+        {% block script %}{% endblock %}
+    </body>
+</html>

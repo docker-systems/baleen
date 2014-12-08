@@ -1,0 +1,10 @@
+{% if coverage_percent %}
+<span style="white-space: nowrap">
+<a href="{{ coverage_html_url }}">{{ coverage_percent }} %</a>
+{% if previous_coverage_percent < coverage_percent %}
+<i class="icon-arrow-up"></i>
+{% elif previous_coverage_percent > coverage_percent %}
+<i class="icon-arrow-down"></i>
+{% endif %}
+</span>
+{% endif %}

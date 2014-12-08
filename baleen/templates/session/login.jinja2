@@ -1,0 +1,21 @@
+{% extends 'base.jinja2' %}
+{%- block title %}
+<title>Login | baleen</title>
+{%- endblock %}
+{% block content %}
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+<form method="post" action="">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autofocus value="">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" value="">
+
+    <div class="form-actions">
+        <input type="submit" class="btn btn-primary" name="op" value="Login">
+    </div>
+    </fieldset>
+</form>
+{% endblock %}

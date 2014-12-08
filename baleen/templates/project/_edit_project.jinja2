@@ -1,0 +1,24 @@
+{% load crispy_forms_tags %}
+<div id="edit-project">
+    <h3>Configure Project</h3>
+    <div class="container-fluid">
+
+        {% crispy form %}
+        <h3>Post-receive hook</h3>
+        <p>Add this url to the github project's post-receive hooks:</p>
+        <p style='font-size: small'>
+            <a href="{{ github_site_url }}{{ project.github_push_url }}">{{ github_site_url }}{{ project.github_push_url }}</a>
+        </p>
+        <p>Add this to the deploy keys</p>
+        <pre style='font-size: small'>{{ project.public_key }}</pre>
+        <h3>SSH Access</h3>
+        <div id="authorized_keys">
+            {% with project.collect_all_authorized_keys as allkeys %}
+            {% for user_host, keys in allkeys.items %}
+            <strong>Put this in </strong><code>~/.ssh/authorized_keys2</code><strong> for <span class="user-account">{{ user_host.0 }}@{{ user_host.1 }}</span></strong>
+            <pre>{{ keys }}</pre>
+            {% endfor %}
+            {% endwith %}
+        </div>
+    </div>
+</div>

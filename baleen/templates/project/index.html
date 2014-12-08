@@ -1,0 +1,75 @@
+{% extends 'base.jinja2' %}
+{% load job_extras %}
+{% block title %}
+<title>Projects | baleen</title>
+{% endblock %}
+{% block content %}
+<h1>Projects</h1>
+{% if projects %}
+<table class="table">
+    <thead>
+        <th>Project</th>
+        <th>Last Success</th>
+        <th>Last Job</th>
+        <th>Tests</th>
+        <th>Coverage</th>
+        <th>Who</th>
+        <th style="text-align:center;">Status</th>
+    </thead>
+    <tbody>
+{% for project in projects %}
+        {% with job=project.last_job %}
+        {% with successful_job=project.last_successful_job %}
+        <tr>
+            <td>
+            {% if project.site_url %}
+                <a href="{{ project.site_url }}"><i class="icon-share"></i></a>
+            {% else %}
+                <i class="icon-"></i>
+            {% endif %}
+            <a href="{% url 'show_project' project_id=project.id %}">{{ project.name }}</a>
+            </td>
+        {% if successful_job %}
+            <td>
+                <a href="{% url 'view_job' project_id=successful_job.project.id job_id=successful_job.id %}"><span class="time-age" data-time="{{ successful_job.finished_at|date:"c" }}"></span></a>
+            </td>
+        {% else %}
+            <td>Never</td>
+        {% endif %}
+        {% if job %}
+            <td>
+                {% if job.started_at %}
+                <a href="{% url 'view_job' project_id=job.project.id job_id=job.id %}"><span class="time-age" data-time="{{ job.started_at|date:"c" }}"></span></a>
+                {% else %}
+                Pending
+                {% endif %}
+            </td>
+            <td>
+                {% render_xunit_summary job.test_action_result %}
+            </td>
+            <td>
+                {% render_coverage job.test_action_result %}
+            </td>
+            <td>
+                {{ job|render_initiating_user }}
+            </td>
+            <td>
+                {{ job|job_status_badge }}
+            </td>
+        {% else %}
+            <td>Never</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        {% endif %}
+        {% endwith %}
+        {% endwith %}
+        </tr>
+{% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No projects yet. <a href="{% url 'add_project' %}">Add one</a>.</p>
+{% endif %}
+{% endblock %}

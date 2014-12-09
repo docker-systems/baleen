@@ -5,7 +5,7 @@ from baleen.artifact.models import (
         CoverageXMLOutput
         )
 from baleen.project.models import Project
-from baleen.action.models import Action
+from baleen.action.models import RemoteSSHAction
 from baleen.job.models import Job
 
 from mock import Mock, patch
@@ -18,7 +18,7 @@ class TestActionOutput(TestCase):
         self.project.generate_github_token()
         self.project.save()
 
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -59,7 +59,7 @@ class TestCoverageXMLOutput(TestCase):
         self.project.generate_github_token()
         self.project.save()
 
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -92,7 +92,7 @@ class TestXUnitOutput(TestCase):
         self.project.generate_github_token()
         self.project.save()
 
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -121,7 +121,7 @@ class TestXUnitOutput(TestCase):
         self.xunit_result = XUnitOutput.objects.get(action_result__id=self.result.id)
 
     def test_get_xunit_failures(self):
-        self.assertTrue('tests.PermissionsTest' in self.xunit_result.parse_xunit_failures())
+        self.assertTrue('tests.UserPermissionsTest' in self.xunit_result.parse_xunit_failures())
 
     def test_parse_test_results(self):
         success, total = self.xunit_result.parse_test_results()
@@ -136,7 +136,7 @@ class TestExpectedOutput(TestCase):
         self.project.generate_github_token()
         self.project.save()
 
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -150,35 +150,3 @@ class TestExpectedOutput(TestCase):
 
     def test_unicode(self):
         self.assertEqual(unicode(self.ea), u"Action 'TestAction' expects Xunit output")
-
-    @patch('baleen.artifact.models.make_tarfile')
-    @patch('baleen.artifact.models.mkdir_p')
-    @patch('baleen.artifact.models.S_ISDIR')
-    def test_fetch(self, ISDIR, mkdir_p, make_tarfile):
-        m = Mock()
-        m.normalize.return_value = 'robots'
-        self.assertEqual(self.ea.fetch(m), None)
-
-        ISDIR.return_value = True
-        self.assertEqual(self.ea.fetch(m), None)
-        ISDIR.return_value = False
-        m.open.return_value.read.return_value = 'test'
-        self.assertEqual(self.ea.fetch(m), 'test')
-
-        m.listdir.return_value = []
-        ISDIR.return_value = True
-        self.assertTrue('rightnow' in self.ea2.fetch(m))
-        self.assertTrue(mkdir_p.call_args[0][0] in make_tarfile.call_args[0][0])
-
-        m.stat.return_value = None
-        self.assertEqual(self.ea.fetch(m), None)
-        self.assertTrue(mkdir_p.call_args[0][0] in make_tarfile.call_args[0][0])
-
-    @patch('baleen.artifact.models.S_ISDIR')
-    @patch('os.mkdir')
-    def test_copy_dir(self, mkdir, ISDIR):
-        m = Mock()
-        m.listdir.return_value = ['file1', 'file2']
-        ISDIR.return_value = False
-        self.ea._copy_dir(m, 'a', 'b')
-        self.assertTrue(m.get.called)

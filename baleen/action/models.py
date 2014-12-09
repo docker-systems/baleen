@@ -1,14 +1,23 @@
 import time
+import os
 import paramiko
 import operator
 import subprocess
+import tempfile
 
-from baleen.utils import statsd_label_converter, generate_ssh_key
 from StringIO import StringIO
+from stat import S_ISDIR
 
 from django.db import models
+from django.conf import settings
+from polymorphic import PolymorphicModel
 
-from baleen.utils import ManagerWithFirstQuery
+from baleen.utils import (
+        statsd_label_converter, generate_ssh_key,
+        ManagerWithFirstQuery,
+        make_tarfile,
+        mkdir_p
+        )
 from baleen.artifact.models import ExpectedActionOutput, output_types, ActionOutput
 
 
@@ -32,7 +41,8 @@ class Hook(models.Model):
     hook_trigger = models.CharField(max_length=1, choices=HOOK_TRIGGERS, default=DONE)
 
 
-class Action(models.Model):
+
+class Action(PolymorphicModel):
     """ Represents one of a series of actions that may be performed after a commit.
 
     TODO: There are some less than stellar security issues here:
@@ -49,28 +59,101 @@ class Action(models.Model):
     index = models.IntegerField()
     name = models.CharField(max_length=64, default='noname')
 
+    active = models.BooleanField(default=False, blank=True,
+            help_text='Actions are deactivated if they are no longer needed/current.')
+
+    def __unicode__(self):
+        return "Action: %s" % self.name
+
+    @property
+    def statsd_name(self):
+        return statsd_label_converter(self.name)
+
+    def execute(self, stdoutlog, stderrlog, action_result):
+        return NotImplemented
+
+    def set_output(self, output_type, location):
+        """ Define expected output from action.
+
+        All Actions produce stdout, stderr, and an exit code.
+
+        Linking ExpectedActionOutput allow for an action to also provide output
+        in files or by other mechanisms.
+
+        - 'output_type' is a constant from baleen.action.models.output_types
+          indicating the type of output.
+        - 'location' indicates where the output is available. It's meaning depends
+          on the action_type.
+          
+        """
+        if not output_type:
+            return
+
+        assert output_type in map(
+                operator.itemgetter(0),
+                output_types.DETAILS
+                ), "Unknown output type"
+
+        try:
+            o = ExpectedActionOutput.objects.get(action=self, output_type=output_type)
+        except ExpectedActionOutput.DoesNotExist:
+            o = ExpectedActionOutput(action=self, output_type=output_type)
+
+        o.location = location
+        o.save()
+
+    def fetch_output(self, o, sftp):
+        return NotImplemented
+
+    def as_form_data(self):
+        output = {
+                'id': self.id,
+                'name': self.name,
+                'project': self.project.id,
+                'index': self.index,
+                }
+        for output_type, output_full_name in output_types.DETAILS:
+            if output_type in output_types.IMPLICIT:
+                continue
+            try:
+                o = ExpectedActionOutput.objects.get(output_type=output_type, action=self)
+                output['output_' + output_type] = o.location
+            except ExpectedActionOutput.DoesNotExist:
+                output['output_' + output_type] = ''
+        return output
+
+    def values_without_keys(self):
+        data = dict(self.values)
+        for k in ['public_key', 'private_key', 'response']:
+            if k in data:
+                del data[k]
+        return data
+
+
+class RemoteSSHAction(Action):
+    """
+    Run a command on a remote host.
+
+    The ExpectedActionOutput's location is presumed to be accessable via scp.
+
+    scp -v -f -- src_file
+
+    Output also includes ssh key pair to allow scp to work.
+
+    """
     username = models.CharField(max_length=64)
     host = models.CharField(max_length=255)
     command = models.TextField()
-
-    enabled = models.BooleanField(default=True, blank=True)
 
     # Output is the locations for various output files that baleen knows how to read.
     # action.valid_output_tags has a list.
     public_key = models.TextField(editable=False)
     private_key = models.TextField(editable=False)
 
-    def __unicode__(self):
-        return "Action: %s" % self.name
-
     def save(self):
         if (not self.private_key or not self.public_key):
             self.private_key, self.public_key = generate_ssh_key()
-        super(Action, self).save()
-
-    @property
-    def statsd_name(self):
-        return statsd_label_converter(self.name)
+        super(RemoteSSHAction, self).save()
 
     @property
     def authorized_keys_entry(self):
@@ -99,8 +182,6 @@ class Action(models.Model):
     def host_address(self):
         if self.host.startswith('lxc:'):
             # This doesn't check that the LXC is actually running
-            # TODO: check lxc is running
-
             # Translate lxc name into ip addr
             lxc_name = self.host[(self.host.index(':') + 1):]
             p = subprocess.Popen(
@@ -115,8 +196,8 @@ class Action(models.Model):
 
     def execute(self, stdoutlog, stderrlog, action_result):
         ssh = paramiko.SSHClient()
-        # TODO - autoadd is evil!
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
         ssh.connect(
             self.host_address,
             username = self.username,
@@ -124,6 +205,7 @@ class Action(models.Model):
             allow_agent = False,
             look_for_keys = False,
         )
+
         transport = ssh.get_transport()
         response = self._run_command(self.command, transport,
                 stdoutlog, stderrlog,
@@ -135,11 +217,55 @@ class Action(models.Model):
             sftp = paramiko.SFTPClient.from_transport(transport)
             response['output'] = {}
             for o in self.expectedactionoutput_set.all():
-                response['output'][o.output_type] = o.fetch(sftp)
+                response['output'][o.output_type] = self.fetch_output(o, sftp)
 
         ssh.close()
 
         return response
+
+    def _copy_dir(self, sftp, src, dest):
+        file_list = sftp.listdir(path=src)
+        for f in file_list:
+            src_f = os.path.join(src,f)
+            dest_f = os.path.join(dest,f)
+            if S_ISDIR(sftp.stat(src_f).st_mode):
+                os.mkdir(os.path.join(dest,f))
+                self._copy_dir(sftp, src_f, dest_f)
+            sftp.get(remotepath=src_f, localpath=dest_f)
+
+    def fetch_output(self, o, sftp):
+        # Assume that default directory is home of the login user
+        location = o.location.replace('~', sftp.normalize('.'))
+
+        stat = sftp.stat(location)
+        if not stat:
+            return None
+
+        if o.output_type == output_types.COVERAGE_HTML:
+            assert S_ISDIR(stat.st_mode)
+            dest = tempfile.mkdtemp(prefix=os.path.split(location)[-1], dir=settings.HTMLCOV_DIR)
+            self._copy_dir(sftp, location, dest)
+            # create an archive in LXC's temp directory.
+            # Then the baleen webapp LXC uses watchdog to extract the archive to somewhere
+            # the webapp can serve them from.
+
+            # make staging dir if it doesn't exist, assumes worker will have permissions
+            mkdir_p(settings.HTMLCOV_LXC_STAGING_DIR)
+            # make archive
+            archive_path = os.path.join(
+                    settings.HTMLCOV_LXC_STAGING_DIR,
+                    os.path.basename(dest) + ".tar.gz")
+            make_tarfile(archive_path, dest)
+
+            return os.path.split(dest)[-1]
+        else:
+            if S_ISDIR(stat.st_mode):
+                return None
+            # to copy file from remote to local
+            f = sftp.open(location)
+            content = f.read()
+            f.close()
+            return content
 
     def _run_command(self, command, transport, stdoutlog=None, stderrlog=None, action_result=None):
         response = {'stdout': '', 'stderr': '', 'code': None}
@@ -195,67 +321,20 @@ class Action(models.Model):
                 h_result[h.hook_trigger] = self._run_command(h.command, transport)
         return h_result
 
-    def set_output(self, output_type, location):
-        """ Define expected output from action.
-
-        All Actions produce stdout, stderr, and an exit code.
-
-        Linking ExpectedActionOutput allow for an action to also provide output
-        in files or by other mechanisms.
-
-        - 'output_type' is a constant from baleen.action.models.output_types
-          indicating the type of output.
-        - 'location' indicates where the output is available. It is presumed to be
-          accessable via scp.
-
-        scp -v -f -- src_file
-
-        Output also includes ssh key pair to allow scp to work.
-
-        """
-        if not output_type:
-            return
-        assert output_type in map(operator.itemgetter(0), output_types.DETAILS), "Unknown output type"
-        try:
-            o = ExpectedActionOutput.objects.get(action=self, output_type=output_type)
-        except ExpectedActionOutput.DoesNotExist:
-            o = ExpectedActionOutput(action=self, output_type=output_type)
-        o.location = location
-        o.save()
-
     def as_form_data(self):
-        output = {
-                'id': self.id,
-                'name': self.name,
-                'project': self.project.id,
+        output = super(RemoteSSHAction, self).as_form_data()
+
+        output.update({
                 'username': self.username,
                 'command': self.command,
                 'host': self.host,
                 'authorized_keys_entry': self.authorized_keys_entry,
-                'index': self.index,
-                }
-        for output_type, output_full_name in output_types.DETAILS:
-            if output_type in output_types.IMPLICIT:
-                continue
-            try:
-                o = ExpectedActionOutput.objects.get(output_type=output_type, action=self)
-                output['output_' + output_type] = o.location
-            except ExpectedActionOutput.DoesNotExist:
-                output['output_' + output_type] = ''
-        #for hook_type in self.valid_hooks:
-            #if hook_type in self.hooks:
-                #output['hook_' + hook_type] = self.hooks[hook_type]
-            #else:
-                #output['hook_' + hook_type] = ''
-        #del output['hooks']
+                })
         return output
 
-    def values_without_keys(self):
-        data = dict(self.values)
-        for k in ['public_key', 'private_key', 'response']:
-            if k in data:
-                del data[k]
-        return data
+
+class FigAction(Action):
+    pass
 
 
 class ActionResult(models.Model):
@@ -266,7 +345,7 @@ class ActionResult(models.Model):
     and status code (0 implies success).
 
     Any output generated by an action is stored in ActionOutput instances which
-    link to this class.
+    link to an instance of class.
     """
     job = models.ForeignKey('job.Job')
 

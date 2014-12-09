@@ -2,11 +2,13 @@ from django.db import models
 from django.conf import settings
 from django.core.urlresolvers import reverse
 
+import logging
 import subprocess
 import tempfile
 import json
 import os
 import stat
+import re
 import gearman
 
 from contextlib import closing
@@ -14,13 +16,15 @@ from base64 import urlsafe_b64encode
 from hashlib import sha256
 
 from baleen.job.models import Job
-
 from baleen.utils import statsd_label_converter, generate_ssh_key, mkdir_p, cd
 
+log = logging.getLogger('baleen.project')
 
 class Project(models.Model):
-    name = models.CharField(max_length=255, unique=True, help_text='Project title')
-    site_url = models.URLField(max_length=255, null=True, blank=True, verbose_name="Site URL",
+    name = models.CharField(max_length=255, unique=True,
+            help_text='Project title')
+    site_url = models.URLField(max_length=255, null=True, blank=True,
+            verbose_name="Site URL",
             help_text='A URL to where this project deploys to')
 
     scm_url = models.CharField(max_length=255, null=True, blank=True,
@@ -64,11 +68,24 @@ class Project(models.Model):
         super(Project, self).save()
         if do_clone:
             gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
-            gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'project': self.id}), background=True)
+            gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps(
+                {
+                    'project': self.id,
+                    'generate_actions': True
+                }), background=True)
 
+    @property
+    def project_dir(self):
+        return re.sub(r'[^a-zA-Z0-9]',' ', self.name)
 
     def sync_repo(self):
+        # ensure BUILD_ROOT exists
         mkdir_p(settings.BUILD_ROOT)
+
+        # This is a little complicated because we want to set up git to use
+        # the ssh key for this project. We do this by using the GIT_SSH environment
+        # variable, and dumping our private key to a temporary file (that only
+        # the current user can read/write)
         fd, identity_fn = tempfile.mkstemp()
         with closing(os.fdopen(fd, 'w')) as tf:
             tf.write(self.private_key)
@@ -79,22 +96,30 @@ class Project(models.Model):
         with closing(os.fdopen(fd, 'w')) as tf:
             tf.write(temp_git_wrap)
 
+        # temp file isn't executable by default
         st = os.stat(git_ssh_fn)
         os.chmod(git_ssh_fn, st.st_mode | stat.S_IEXEC)
 
         os.environ['GIT_SSH'] = git_ssh_fn
+        
         with cd(settings.BUILD_ROOT):
             git_checkout = subprocess.Popen(
-                ["git", "clone", self.scm_url],
+                ["git", "clone", self.scm_url, self.project_dir],
                 stdout=subprocess.PIPE
                 ).stdout.read()
         del os.environ['GIT_SSH']
 
+        # Clean up after outselves
         os.remove(identity_fn)
         os.remove(git_ssh_fn)
 
         result = git_checkout.decode('utf-8')
-        print result
+        log.debug('Git checkout stdout: %s' % result)
+
+    def _raw_yaml(self):
+        """ Read yaml file defining build """
+        with cd(settings.BUILD_ROOT):
+            pass
 
     @property
     def statsd_name(self):

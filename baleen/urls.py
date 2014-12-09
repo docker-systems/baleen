@@ -7,6 +7,7 @@ admin.autodiscover()
 urlpatterns = patterns('',
     url(r'^$', 'baleen.views.home', name='home'),
     url(r'^project/', include('baleen.project.urls')),
+    url(r'^project/', include('baleen.action.urls')),
     #url(r'^jobs/', include('baleen.job.urls')),
     url(r'^github/(?P<github_token>[^/]+)$', 'baleen.views.github', name='github_url'),
     #url(r'^users/', include('baleen.project.users')),

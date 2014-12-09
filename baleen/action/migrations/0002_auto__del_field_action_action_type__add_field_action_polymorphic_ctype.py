@@ -8,82 +8,37 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding model 'Hook'
-        db.create_table(u'action_hook', (
-            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('project', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['project.Project'])),
-            ('action', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['action.Action'], null=True, blank=True)),
-            ('command', self.gf('django.db.models.fields.TextField')()),
-            ('hook_trigger', self.gf('django.db.models.fields.CharField')(default='D', max_length=1)),
-        ))
-        db.send_create_signal(u'action', ['Hook'])
+        # Deleting field 'Action.action_type'
+        db.delete_column(u'action_action', 'action_type')
 
-        # Adding model 'Action'
-        db.create_table(u'action_action', (
-            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('project', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['project.Project'])),
-            ('index', self.gf('django.db.models.fields.IntegerField')()),
-            ('name', self.gf('django.db.models.fields.CharField')(default='noname', max_length=64)),
-            ('action_type', self.gf('django.db.models.fields.CharField')(max_length=2)),
-            ('active', self.gf('django.db.models.fields.BooleanField')(default=False)),
-        ))
-        db.send_create_signal(u'action', ['Action'])
-
-        # Adding model 'RemoteSSHAction'
-        db.create_table(u'action_remotesshaction', (
-            (u'action_ptr', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['action.Action'], unique=True, primary_key=True)),
-            ('username', self.gf('django.db.models.fields.CharField')(max_length=64)),
-            ('host', self.gf('django.db.models.fields.CharField')(max_length=255)),
-            ('command', self.gf('django.db.models.fields.TextField')()),
-            ('public_key', self.gf('django.db.models.fields.TextField')()),
-            ('private_key', self.gf('django.db.models.fields.TextField')()),
-        ))
-        db.send_create_signal(u'action', ['RemoteSSHAction'])
-
-        # Adding model 'FigAction'
-        db.create_table(u'action_figaction', (
-            (u'action_ptr', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['action.Action'], unique=True, primary_key=True)),
-        ))
-        db.send_create_signal(u'action', ['FigAction'])
-
-        # Adding model 'ActionResult'
-        db.create_table(u'action_actionresult', (
-            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('job', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['job.Job'])),
-            ('action', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['action.Action'])),
-            ('started_at', self.gf('django.db.models.fields.DateTimeField')()),
-            ('finished_at', self.gf('django.db.models.fields.DateTimeField')(null=True)),
-            ('status_code', self.gf('django.db.models.fields.IntegerField')(null=True)),
-            ('message', self.gf('django.db.models.fields.TextField')(blank=True)),
-        ))
-        db.send_create_signal(u'action', ['ActionResult'])
+        # Adding field 'Action.polymorphic_ctype'
+        db.add_column(u'action_action', 'polymorphic_ctype',
+                      self.gf('django.db.models.fields.related.ForeignKey')(related_name=u'polymorphic_action.action_set', null=True, to=orm['contenttypes.ContentType']),
+                      keep_default=False)
 
 
     def backwards(self, orm):
-        # Deleting model 'Hook'
-        db.delete_table(u'action_hook')
 
-        # Deleting model 'Action'
-        db.delete_table(u'action_action')
+        # User chose to not deal with backwards NULL issues for 'Action.action_type'
+        raise RuntimeError("Cannot reverse this migration. 'Action.action_type' and its values cannot be restored.")
+        
+        # The following code is provided here to aid in writing a correct migration        # Adding field 'Action.action_type'
+        db.add_column(u'action_action', 'action_type',
+                      self.gf('django.db.models.fields.CharField')(max_length=2),
+                      keep_default=False)
 
-        # Deleting model 'RemoteSSHAction'
-        db.delete_table(u'action_remotesshaction')
-
-        # Deleting model 'FigAction'
-        db.delete_table(u'action_figaction')
-
-        # Deleting model 'ActionResult'
-        db.delete_table(u'action_actionresult')
+        # Deleting field 'Action.polymorphic_ctype'
+        db.delete_column(u'action_action', 'polymorphic_ctype_id')
 
 
     models = {
         u'action.action': {
             'Meta': {'object_name': 'Action'},
-            'action_type': ('django.db.models.fields.CharField', [], {'max_length': '2'}),
             'active': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'index': ('django.db.models.fields.IntegerField', [], {}),
             'name': ('django.db.models.fields.CharField', [], {'default': "'noname'", 'max_length': '64'}),
+            'polymorphic_ctype': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "u'polymorphic_action.action_set'", 'null': 'True', 'to': u"orm['contenttypes.ContentType']"}),
             'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"})
         },
         u'action.actionresult': {

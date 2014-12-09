@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 
 from baleen.project.models import Project
-from baleen.action.models import Action
+from baleen.action.models import RemoteSSHAction
 
 from mock import patch
 
@@ -17,7 +17,7 @@ class ProjectTest(TestCase):
         self.project = Project(name='TestProject')
         self.project.generate_github_token()
         self.project.save()
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -32,7 +32,8 @@ class ProjectTest(TestCase):
         self.project.name = 'test something    now'
         self.assertEqual(self.project.statsd_name, 'test_something_now')
 
-    def test_github_hook(self):
+    @patch('gearman.GearmanClient')
+    def test_github_hook(self, gearman):
         data = {'payload': json.dumps({'commits': []})}
         response = self.client.post(reverse('github_url', kwargs={'github_token': self.project.github_token}), data=data)
         self.assertContains(response, 'processed')
@@ -44,7 +45,7 @@ class ProjectTestView(TestCase):
         self.project = Project(name='TestProject')
         self.project.generate_github_token()
         self.project.save()
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -56,7 +57,8 @@ class ProjectTestView(TestCase):
         response = self.client.get(reverse('project_index'))
         self.assertContains(response, "TestProject")
 
-    def test_add(self):
+    @patch('gearman.GearmanClient')
+    def test_add(self, gearman):
         response = self.client.get(reverse('add_project'))
 
         post_data = {
@@ -72,7 +74,8 @@ class ProjectTestView(TestCase):
         response = self.client.get(reverse('show_project', kwargs=dict(project_id=self.project.id)))
         self.assertContains(response, "TestProject")
 
-    def test_update(self):
+    @patch('gearman.GearmanClient')
+    def test_update(self, gearman):
         post_data = {
                 'name':	'A Great Project',
                 'site_url': 'http://google.com',

@@ -32,6 +32,7 @@ def manual_run(project, user):
 class Job(models.Model):
     project = models.ForeignKey('project.Project')
     github_data = JSONField()
+
     received_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)

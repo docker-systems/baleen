@@ -5,7 +5,7 @@ from django.utils.timezone import now
 
 from baleen.project.models import Project
 from baleen.job.models import Job, manual_run
-from baleen.action.models import Action, ActionResult
+from baleen.action.models import RemoteSSHAction, ActionResult
 from baleen.artifact.models import (
         output_types, ActionOutput,
         ExpectedActionOutput
@@ -20,7 +20,7 @@ class JobTest(TestCase):
         self.project.generate_github_token()
         self.project.save()
 
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 
@@ -191,7 +191,7 @@ class JobTemplateTagsTest(TestCase):
         self.project.generate_github_token()
         self.project.save()
 
-        self.action = Action(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
         self.action.save()
 

@@ -9,6 +9,7 @@ pygments
 django-allauth
 django-sendfile
 requests
+django-polymorphic
 
 gearman
 paramiko

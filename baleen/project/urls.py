@@ -5,12 +5,6 @@ urlpatterns = patterns('',
     url(r'^add$', 'baleen.project.views.add', name='add_project'),
     url(r'^(?P<project_id>\d+)$', 'baleen.project.views.show', name='show_project'),
     url(r'^(?P<project_id>\d+)/deploy$', 'baleen.project.views.manual_deploy', name='manual_deploy'),
-
-    url(r'^(?P<project_id>\d+)/action$', 'baleen.project.views.add_action', name='add_action'),
-    url(r'^(?P<project_id>\d+)/action/(?P<action_id>\d+)$',
-        'baleen.project.views.edit_action', name='edit_action'),
-    url(r'^(?P<project_id>\d+)/action-order$',
-        'baleen.project.views.set_action_order', name='set_action_order'),
 )
 
 urlpatterns += patterns('',

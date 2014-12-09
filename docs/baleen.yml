@@ -1,0 +1,105 @@
+build:
+   # build this image, using the current dir as the docker context
+   docker.example.com/app: .
+   # example of building multiple images from dockerfile in different dir:
+   #- docker.example.com/rabbitmq: containers/rabbitmq/.
+   #- docker.example.com/couchdb: containers/couchdb/.
+
+# All credentials that are used are defined. The UI will allow these
+# to be filled in. They will be passed to any containers that needs them.
+# By default these are assumed to be unique and part of a set within a multi
+# container setup.  e.g. if one container requires RABBIT_USER, then any other
+# containers with credential RABBIT_USER will get the same value.
+#
+# All are provided to the container at run time as environment variables.
+# FILE means a file will be uploaded and the environment variable will
+# be the path to it.
+#
+# Some day these may alternatively be placed in a config system like etcd,
+# or be placed in a config file format at a configurable location.
+credentials:
+    RABBIT_CERTIFICATE: FILE,
+    RABBIT_USER: VALUE,
+    RABBIT_PASSWORD: VALUE,
+
+# by default, all dependent containers will be built and be available
+# and linked in as their label name
+depends:
+   rabbitmq:
+      src: "git@github.com:docker-systems/rabbitmq.git"
+      minhash: "deedbeef" # must have this commit
+      # image should be inferred from the baleen.yml of the src repo
+      # image: "docker.example.com/rabbitmq"
+      #tag: v0.1.1
+   db:
+      # use official image from dockerhub
+      image: "postgres"
+   couchdb:
+      image: "docker.example.com/couchdb"
+
+# Need to define this better, what will be set up etc.
+pre_test:
+  - "echo 1"
+  - "load up any data"
+
+containers:
+  web:
+    build: .
+    command: python app.py
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/code
+    links:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+  redis:
+    image: redis:latest
+    command: redis-server --appendonly yes
+tests:
+    # Tests should run with their minimal dependencies to avoid complexity
+    links:
+        # remap the link, otherwise uses --link db. --link rabbitmq is implicit
+        - "db:db1"
+    ports:
+       - "8000:8000"
+    env:
+       TEST: 1
+       # will also have credential variables defined above
+    volumes:
+       # preserve between runs so that multiple commands can have persistent effects
+       - "/data"
+    cmd:
+       # each command is a separate container run, they will share the same
+       # volume
+       - "run_tests.sh"
+       - "collect_coverage.sh"
+
+# How to run integration tests?
+# integration tests may require prompting from outside the system, whether it
+# is from a browser, a selenium controlled browser like browserstack or other.
+# To run them using baleen requires making another container that links all
+# the dependencies together and then connects via running something within that
+# integration container (e.g. a headless browser)
+
+# All artifacts will be preserved and available for each build.
+# Some artifacts like coverage % and test counts will be graphed.
+# htmldir and files will be downloadable and served from baleen too
+artifacts:
+  xunit:
+    python_xml: /data/xunit.xml
+  coverage:
+    python_xml: /data/coverage.xml
+    htmldir: /data/htmlcov/
+  documentation:
+    htmldir: /data/mydocs
+  pdf:
+    file: /data/my.pdf
+
+# custom or should we be more declarative?
+deploy:
+    - "docker push docker.example.com/app:latest"
+    - "docker stop app"
+    # question, should we try to define the parts like 
+    - "docker run --rm --name app -t docker.example.com/app:latest"

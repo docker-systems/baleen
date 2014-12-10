@@ -12,11 +12,14 @@ import re
 import gearman
 
 from contextlib import closing
-from base64 import urlsafe_b64encode
-from hashlib import sha256
 
 from baleen.job.models import Job
-from baleen.utils import statsd_label_converter, generate_ssh_key, mkdir_p, cd
+from baleen.utils import (
+        statsd_label_converter,
+        generate_ssh_key,
+        mkdir_p, cd,
+        generate_github_token
+        )
 
 log = logging.getLogger('baleen.project')
 
@@ -58,7 +61,7 @@ class Project(models.Model):
     def save(self):
         do_clone = False
         if self.pk is None:
-            self.github_token = self.generate_github_token()
+            self.github_token = generate_github_token()
             self.private_key, self.public_key = generate_ssh_key()
         if self._original_scm_url != self.scm_url:
             # The revision control url changed, we need to fire a task to
@@ -126,11 +129,6 @@ class Project(models.Model):
         return statsd_label_converter(self.name)
 
     @classmethod
-    def generate_github_token(self):
-        seed = os.urandom(32)
-        token = sha256(sha256(seed).digest()).digest()
-        github_token = urlsafe_b64encode(token)[:-2]
-        return github_token
 
     def github_push_url(self):
         return reverse('github_url', kwargs={'github_token': self.github_token} )
@@ -178,3 +176,4 @@ class Project(models.Model):
                 keys.extend(all_hosts[user_and_host])
             all_hosts[user_and_host] = '\n'.join(keys)
         return all_hosts
+

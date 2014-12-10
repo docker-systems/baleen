@@ -4,6 +4,8 @@ import tarfile
 import errno
 import paramiko
 
+from hashlib import sha256
+from base64 import urlsafe_b64encode
 from contextlib import contextmanager
 from StringIO import StringIO
 
@@ -64,3 +66,10 @@ def generate_ssh_key(length=2048):
     private_key = buf.getvalue()
     public_key = 'ssh-rsa %s' % key.get_base64()
     return private_key, public_key
+
+
+def generate_github_token(self):
+    seed = os.urandom(32)
+    token = sha256(sha256(seed).digest()).digest()
+    github_token = urlsafe_b64encode(token)[:-2]
+    return github_token

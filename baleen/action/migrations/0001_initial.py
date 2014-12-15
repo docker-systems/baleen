@@ -12,45 +12,38 @@ class Migration(SchemaMigration):
         db.create_table(u'action_hook', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('project', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['project.Project'])),
-            ('action', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['action.Action'], null=True, blank=True)),
-            ('command', self.gf('django.db.models.fields.TextField')()),
-            ('hook_trigger', self.gf('django.db.models.fields.CharField')(default='D', max_length=1)),
+            ('watch_for', self.gf('django.db.models.fields.CharField')(max_length=255)),
+            ('email_user', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['auth.User'])),
+            ('email_address', self.gf('django.db.models.fields.EmailField')(max_length=255)),
+            ('email_author', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('post_url', self.gf('django.db.models.fields.URLField')(max_length=200)),
         ))
         db.send_create_signal(u'action', ['Hook'])
 
-        # Adding model 'Action'
-        db.create_table(u'action_action', (
+        # Adding model 'WaitingFor'
+        db.create_table(u'action_waitingfor', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('project', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['project.Project'])),
-            ('index', self.gf('django.db.models.fields.IntegerField')()),
-            ('name', self.gf('django.db.models.fields.CharField')(default='noname', max_length=64)),
-            ('action_type', self.gf('django.db.models.fields.CharField')(max_length=2)),
-            ('active', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('waiting_for', self.gf('django.db.models.fields.related.ForeignKey')(related_name='blocking_projects', to=orm['action.BuildDefinition'])),
         ))
-        db.send_create_signal(u'action', ['Action'])
+        db.send_create_signal(u'action', ['WaitingFor'])
 
-        # Adding model 'RemoteSSHAction'
-        db.create_table(u'action_remotesshaction', (
-            (u'action_ptr', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['action.Action'], unique=True, primary_key=True)),
-            ('username', self.gf('django.db.models.fields.CharField')(max_length=64)),
-            ('host', self.gf('django.db.models.fields.CharField')(max_length=255)),
-            ('command', self.gf('django.db.models.fields.TextField')()),
-            ('public_key', self.gf('django.db.models.fields.TextField')()),
-            ('private_key', self.gf('django.db.models.fields.TextField')()),
+        # Adding model 'BuildDefinition'
+        db.create_table(u'action_builddefinition', (
+            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('project', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['project.Project'])),
+            ('commit', self.gf('django.db.models.fields.CharField')(max_length=255, null=True, blank=True)),
+            ('filename', self.gf('django.db.models.fields.CharField')(max_length=255, null=True, blank=True)),
+            ('raw_plan', self.gf('django.db.models.fields.TextField')(null=True, blank=True)),
+            ('plan_type', self.gf('django.db.models.fields.CharField')(max_length=255, null=True, blank=True)),
         ))
-        db.send_create_signal(u'action', ['RemoteSSHAction'])
-
-        # Adding model 'FigAction'
-        db.create_table(u'action_figaction', (
-            (u'action_ptr', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['action.Action'], unique=True, primary_key=True)),
-        ))
-        db.send_create_signal(u'action', ['FigAction'])
+        db.send_create_signal(u'action', ['BuildDefinition'])
 
         # Adding model 'ActionResult'
         db.create_table(u'action_actionresult', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('job', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['job.Job'])),
-            ('action', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['action.Action'])),
+            ('action', self.gf('django.db.models.fields.CharField')(max_length=255)),
             ('started_at', self.gf('django.db.models.fields.DateTimeField')()),
             ('finished_at', self.gf('django.db.models.fields.DateTimeField')(null=True)),
             ('status_code', self.gf('django.db.models.fields.IntegerField')(null=True)),
@@ -63,32 +56,20 @@ class Migration(SchemaMigration):
         # Deleting model 'Hook'
         db.delete_table(u'action_hook')
 
-        # Deleting model 'Action'
-        db.delete_table(u'action_action')
+        # Deleting model 'WaitingFor'
+        db.delete_table(u'action_waitingfor')
 
-        # Deleting model 'RemoteSSHAction'
-        db.delete_table(u'action_remotesshaction')
-
-        # Deleting model 'FigAction'
-        db.delete_table(u'action_figaction')
+        # Deleting model 'BuildDefinition'
+        db.delete_table(u'action_builddefinition')
 
         # Deleting model 'ActionResult'
         db.delete_table(u'action_actionresult')
 
 
     models = {
-        u'action.action': {
-            'Meta': {'object_name': 'Action'},
-            'action_type': ('django.db.models.fields.CharField', [], {'max_length': '2'}),
-            'active': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'index': ('django.db.models.fields.IntegerField', [], {}),
-            'name': ('django.db.models.fields.CharField', [], {'default': "'noname'", 'max_length': '64'}),
-            'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"})
-        },
         u'action.actionresult': {
             'Meta': {'object_name': 'ActionResult'},
-            'action': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['action.Action']"}),
+            'action': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
             'finished_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'job': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['job.Job']"}),
@@ -96,26 +77,30 @@ class Migration(SchemaMigration):
             'started_at': ('django.db.models.fields.DateTimeField', [], {}),
             'status_code': ('django.db.models.fields.IntegerField', [], {'null': 'True'})
         },
-        u'action.figaction': {
-            'Meta': {'object_name': 'FigAction', '_ormbases': [u'action.Action']},
-            u'action_ptr': ('django.db.models.fields.related.OneToOneField', [], {'to': u"orm['action.Action']", 'unique': 'True', 'primary_key': 'True'})
+        u'action.builddefinition': {
+            'Meta': {'object_name': 'BuildDefinition'},
+            'commit': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
+            'filename': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'plan_type': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
+            'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"}),
+            'raw_plan': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'})
         },
         u'action.hook': {
             'Meta': {'object_name': 'Hook'},
-            'action': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['action.Action']", 'null': 'True', 'blank': 'True'}),
-            'command': ('django.db.models.fields.TextField', [], {}),
-            'hook_trigger': ('django.db.models.fields.CharField', [], {'default': "'D'", 'max_length': '1'}),
+            'email_address': ('django.db.models.fields.EmailField', [], {'max_length': '255'}),
+            'email_author': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'email_user': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['auth.User']"}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"})
+            'post_url': ('django.db.models.fields.URLField', [], {'max_length': '200'}),
+            'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"}),
+            'watch_for': ('django.db.models.fields.CharField', [], {'max_length': '255'})
         },
-        u'action.remotesshaction': {
-            'Meta': {'object_name': 'RemoteSSHAction', '_ormbases': [u'action.Action']},
-            u'action_ptr': ('django.db.models.fields.related.OneToOneField', [], {'to': u"orm['action.Action']", 'unique': 'True', 'primary_key': 'True'}),
-            'command': ('django.db.models.fields.TextField', [], {}),
-            'host': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            'private_key': ('django.db.models.fields.TextField', [], {}),
-            'public_key': ('django.db.models.fields.TextField', [], {}),
-            'username': ('django.db.models.fields.CharField', [], {'max_length': '64'})
+        u'action.waitingfor': {
+            'Meta': {'object_name': 'WaitingFor'},
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"}),
+            'waiting_for': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'blocking_projects'", 'to': u"orm['action.BuildDefinition']"})
         },
         u'auth.group': {
             'Meta': {'object_name': 'Group'},

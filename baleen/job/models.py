@@ -10,7 +10,8 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 
 from baleen.action.models import ActionResult
-from baleen.artifact.models import ActionOutput, output_types, ExpectedActionOutput
+from baleen.action.actions import ExpectedActionOutput
+from baleen.artifact.models import ActionOutput, output_types
 
 from baleen.utils import ManagerWithFirstQuery
 
@@ -95,7 +96,6 @@ class Job(models.Model):
 
         for output_type, the_output in response.get('output', {}).items():
             # Check we are expecting output for this action
-            ExpectedActionOutput.objects.get(action=a.action, output_type=output_type)
             ao = ActionOutput(output=the_output, action_result=a, output_type=output_type)
             ao.save()
 

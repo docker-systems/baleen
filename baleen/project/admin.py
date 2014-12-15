@@ -1,12 +1,11 @@
 from django.contrib import admin
 
 from baleen.project.models import Project
-from baleen.action.models import Action
+from baleen.action.models import BuildDefinition
 
-class ActionInline(admin.TabularInline):
-    model = Action
+class BuildDefinitionInline(admin.TabularInline):
+    model = BuildDefinition
 
 class ProjectAdmin(admin.ModelAdmin):
-    inlines = [ActionInline]
+    inlines = [BuildDefinitionInline]
 admin.site.register(Project, ProjectAdmin)
-

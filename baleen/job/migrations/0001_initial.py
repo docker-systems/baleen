@@ -85,10 +85,11 @@ class Migration(SchemaMigration):
             'github_data_received': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'github_token': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'manual_config': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'name': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255'}),
             'private_key': ('django.db.models.fields.TextField', [], {}),
-            'project_dir': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
             'public_key': ('django.db.models.fields.TextField', [], {}),
+            'scm_url': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
             'site_url': ('django.db.models.fields.URLField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'})
         }
     }

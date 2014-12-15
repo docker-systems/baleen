@@ -1,18 +1,12 @@
-import reversion
-
 from django.contrib import admin
 
-from baleen.action.models import Action, ActionResult
-from baleen.artifact.models import ActionOutput, ExpectedActionOutput
+from baleen.action.models import ActionResult, BuildDefinition
+from baleen.artifact.models import ActionOutput
 
 
-class ExpectedActionOutputInline(admin.TabularInline):
-    model = ExpectedActionOutput
-
-
-class ActionAdmin(reversion.VersionAdmin):
-    inlines = [ExpectedActionOutputInline]
-admin.site.register(Action, ActionAdmin)
+class BuildDefinitionAdmin(admin.ModelAdmin):
+    pass
+admin.site.register(BuildDefinition, BuildDefinitionAdmin)
 
 
 class ActionOutputInline(admin.TabularInline):
@@ -22,4 +16,3 @@ class ActionOutputInline(admin.TabularInline):
 class ActionResultAdmin(admin.ModelAdmin):
     inlines = [ActionOutputInline]
 admin.site.register(ActionResult, ActionResultAdmin)
-

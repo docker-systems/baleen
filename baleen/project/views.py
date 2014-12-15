@@ -60,10 +60,8 @@ def show(request, project_id):
     else:
         form = ProjectForm(instance=p)
 
-    action_data = []
-    for i, action in enumerate(p.ordered_actions):
-        action_data.append(action.as_form_data())
-
+    action_data = [x for x in p.action_plan()]
+    
     context_instance = RequestContext(request)
 
     #form.helper.form_action = reverse('show_project')

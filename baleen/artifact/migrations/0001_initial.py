@@ -8,20 +8,11 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding model 'ExpectedActionOutput'
-        db.create_table(u'artifact_expectedactionoutput', (
-            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('action', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['action.Action'])),
-            ('output_type', self.gf('django.db.models.fields.CharField')(max_length=2)),
-            ('location', self.gf('django.db.models.fields.CharField')(max_length=255)),
-        ))
-        db.send_create_signal(u'artifact', ['ExpectedActionOutput'])
-
         # Adding model 'ActionOutput'
         db.create_table(u'artifact_actionoutput', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('output_type', self.gf('django.db.models.fields.CharField')(default='SO', max_length=2)),
             ('action_result', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['action.ActionResult'])),
+            ('output_type', self.gf('django.db.models.fields.CharField')(default='SO', max_length=2)),
             ('output', self.gf('django.db.models.fields.TextField')(null=True, blank=True)),
             ('data', self.gf('jsonfield.fields.JSONField')()),
         ))
@@ -29,30 +20,14 @@ class Migration(SchemaMigration):
 
 
     def backwards(self, orm):
-        # Deleting model 'ExpectedActionOutput'
-        db.delete_table(u'artifact_expectedactionoutput')
-
         # Deleting model 'ActionOutput'
         db.delete_table(u'artifact_actionoutput')
 
 
     models = {
-        u'action.action': {
-            'Meta': {'object_name': 'Action'},
-            'command': ('django.db.models.fields.TextField', [], {}),
-            'enabled': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
-            'host': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'index': ('django.db.models.fields.IntegerField', [], {}),
-            'name': ('django.db.models.fields.CharField', [], {'default': "'noname'", 'max_length': '64'}),
-            'private_key': ('django.db.models.fields.TextField', [], {}),
-            'project': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['project.Project']"}),
-            'public_key': ('django.db.models.fields.TextField', [], {}),
-            'username': ('django.db.models.fields.CharField', [], {'max_length': '64'})
-        },
         u'action.actionresult': {
             'Meta': {'object_name': 'ActionResult'},
-            'action': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['action.Action']"}),
+            'action': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
             'finished_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'job': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['job.Job']"}),
@@ -67,13 +42,6 @@ class Migration(SchemaMigration):
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'output': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
             'output_type': ('django.db.models.fields.CharField', [], {'default': "'SO'", 'max_length': '2'})
-        },
-        u'artifact.expectedactionoutput': {
-            'Meta': {'object_name': 'ExpectedActionOutput'},
-            'action': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['action.Action']"}),
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'location': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            'output_type': ('django.db.models.fields.CharField', [], {'max_length': '2'})
         },
         u'auth.group': {
             'Meta': {'object_name': 'Group'},
@@ -130,10 +98,11 @@ class Migration(SchemaMigration):
             'github_data_received': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'github_token': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'manual_config': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'name': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255'}),
             'private_key': ('django.db.models.fields.TextField', [], {}),
-            'project_dir': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
             'public_key': ('django.db.models.fields.TextField', [], {}),
+            'scm_url': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
             'site_url': ('django.db.models.fields.URLField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'})
         }
     }

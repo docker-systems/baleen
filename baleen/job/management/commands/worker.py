@@ -160,7 +160,7 @@ class Command(BaseCommand):
 
         self.current_baleen_job = job
 
-        actions = job.project.ordered_actions
+        actions = job.project.action_plan
         print "Running job %s" % job_id
 
         # Only one job per project!  Until we have per-project queues,

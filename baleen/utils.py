@@ -68,7 +68,7 @@ def generate_ssh_key(length=2048):
     return private_key, public_key
 
 
-def generate_github_token(self):
+def generate_github_token():
     seed = os.urandom(32)
     token = sha256(sha256(seed).digest()).digest()
     github_token = urlsafe_b64encode(token)[:-2]

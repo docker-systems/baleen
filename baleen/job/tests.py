@@ -5,11 +5,11 @@ from django.utils.timezone import now
 
 from baleen.project.models import Project
 from baleen.job.models import Job, manual_run
-from baleen.action.models import RemoteSSHAction, ActionResult
 from baleen.artifact.models import (
-        output_types, ActionOutput,
-        ExpectedActionOutput
+        output_types, ActionOutput
         )
+from baleen.action.actions import RemoteSSHAction, ExpectedActionOutput
+from baleen.action.models import ActionResult
 
 from mock import patch, Mock
 
@@ -17,12 +17,10 @@ class JobTest(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
 
         self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
         self.user.save()
@@ -140,7 +138,6 @@ class JobTest(TestCase):
     def test_view_html_coverage(self):
         ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
                 location='rightnow')
-        ea2.save()
 
         self.job.record_action_start(self.action)
         response = {
@@ -162,7 +159,7 @@ class JobTest(TestCase):
         m.return_value = HttpResponse('test')
         ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
                 location='rightnow')
-        ea2.save()
+        self.action.set_output(ea2)
 
         self.job.record_action_start(self.action)
         response = {
@@ -188,12 +185,10 @@ class JobTemplateTagsTest(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
 
         self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
         self.user.save()
@@ -262,9 +257,7 @@ class JobTemplateTagsTest(TestCase):
 
     def test_render_coverage(self):
         ea = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_XML)
-        ea.save()
         ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT)
-        ea2.save()
 
         self.job.record_action_start(self.action)
         cover_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -280,12 +273,9 @@ class JobTemplateTagsTest(TestCase):
 
     def test_render_coverage_with_html(self):
         ea = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_XML)
-        ea.save()
         ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
                 location='rightnow')
-        ea2.save()
         ea3 = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT)
-        ea3.save()
 
         self.job.record_action_start(self.action)
         cover_xml = """<?xml version="1.0" encoding="UTF-8"?>

@@ -42,19 +42,6 @@ class OutputManager(ManagerWithFirstQuery):
         return super(OutputManager, self).get_query_set().filter(output_type=self.output_type)
 
 
-class ExpectedActionOutput(models.Model):
-    action = models.ForeignKey('action.Action')
-
-    output_type = models.CharField(max_length=2, choices=output_types.DETAILS)
-
-    location = models.CharField(max_length=255)
-
-    def __unicode__(self):
-        return "Action '%s' expects %s output" % (
-                self.action.name,
-                self.get_output_type_display(), )
-
-
 class ActionOutput(models.Model):
     """
     An ActionOutput is a generic model for representing output that is the
@@ -79,7 +66,7 @@ class ActionOutput(models.Model):
     def __unicode__(self):
         return "Output %s for Action '%s'" % (
                 self.get_output_type_display(),
-                self.action_result.action.name )
+                self.action_result.action )
 
 
 class XUnitOutput(ActionOutput):

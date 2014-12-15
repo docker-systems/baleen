@@ -173,7 +173,7 @@ INSTALLED_APPS = (
 TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
 NOSE_ARGS = [
     '--with-xunit', '--with-doctest', #strange error not finding this
-
+    '-I', 'local_settings.*'
     ]
 NOSE_PLUGINS = [
     'baleen.nose_plugins.SilenceSouth',

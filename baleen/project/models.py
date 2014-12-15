@@ -23,6 +23,7 @@ from baleen.utils import (
 
 log = logging.getLogger('baleen.project')
 
+
 class Project(models.Model):
     name = models.CharField(max_length=255, unique=True,
             help_text='Project title')
@@ -57,6 +58,14 @@ class Project(models.Model):
 
     def __unicode__(self):
         return "Project %s" % self.name
+
+    def action_plan(self):
+        from baleen.action.actions import parse_build_definition
+
+        bd = self.builddefinition_set.all().order_by('commit').first()
+        if bd:
+            return parse_build_definition(bd.first())
+        return []
 
     def save(self):
         do_clone = False
@@ -128,14 +137,8 @@ class Project(models.Model):
     def statsd_name(self):
         return statsd_label_converter(self.name)
 
-    @classmethod
-
     def github_push_url(self):
         return reverse('github_url', kwargs={'github_token': self.github_token} )
-
-    @property
-    def ordered_actions(self):
-        return self.action_set.all().order_by('index')
 
     def current_job(self):
         qs = Job.objects.filter(project=self, finished_at=None, started_at__isnull=False)
@@ -166,10 +169,11 @@ class Project(models.Model):
 
     def collect_all_authorized_keys(self, include_comments=True):
         all_hosts = {}
-        for action in self.ordered_actions:
-            user_and_host = (action.username, action.host)
-            all_hosts.setdefault(user_and_host,[])
-            all_hosts[user_and_host].append(action.authorized_keys_entry)
+        for action in self.action_plan:
+            if isinstance(action, RemoteSSHAction):
+                user_and_host = (action.username, action.host)
+                all_hosts.setdefault(user_and_host,[])
+                all_hosts[user_and_host].append(action.authorized_keys_entry)
         for user_and_host in all_hosts:
             if include_comments:
                 keys = ['## ' + self.name]
@@ -177,3 +181,16 @@ class Project(models.Model):
             all_hosts[user_and_host] = '\n'.join(keys)
         return all_hosts
 
+
+class Credential(models.Model):
+    """
+    Used for storing CI credentials related to a project.
+
+    They may be needed by project to run commands on remote hosts, with the
+    value being an ssh key, or they may be usernames/passwords for the
+    tested projects.
+    """
+    project = models.ForeignKey('Project')
+    name = models.CharField(max_length=255)
+    value = models.TextField(max_length=255)
+    environment = models.BooleanField(default=False)

@@ -1,5 +1,6 @@
 from django import template
 from django.utils.safestring import mark_safe
+from django.utils.text import slugify
 from django.core.urlresolvers import reverse
 from xml.etree.ElementTree import ParseError
 
@@ -34,7 +35,7 @@ def render_coverage(ar):
                     project_id=ar.job.project.id,
                     job_id=ar.job.id,
                     filename='index.html',
-                    action_id=coverage_html.action_result.action.id)
+                    action=slugify(coverage_html.action_result.action))
                 )
 
     cover_exists = coverage_xml or coverage_html

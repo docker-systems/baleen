@@ -1,11 +1,11 @@
 from django.test import TestCase
 
 from baleen.artifact.models import (
-        ExpectedActionOutput, XUnitOutput, output_types, ActionOutput,
+        XUnitOutput, output_types, ActionOutput,
         CoverageXMLOutput
         )
 from baleen.project.models import Project
-from baleen.action.models import RemoteSSHAction
+from baleen.action.actions import RemoteSSHAction, ExpectedActionOutput
 from baleen.job.models import Job
 
 from mock import Mock, patch
@@ -15,12 +15,10 @@ class TestActionOutput(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
 
         self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.job = Job(project=self.project, github_data='{}')
         self.job.save()
@@ -37,7 +35,7 @@ class TestActionOutput(TestCase):
                 output_type=output_types.STDOUT)
 
     def test_unicode(self):
-        self.assertEqual(unicode(self.action_output), u"Output stdout for Action 'TestAction'")
+        self.assertEqual(unicode(self.action_output), u"Output stdout for Action 'RemoteSSHAction: TestAction'")
 
     def test_in_progress(self):
         self.assertEqual(self.result.in_progress, False)
@@ -56,18 +54,15 @@ class TestCoverageXMLOutput(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
 
         self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.job = Job(project=self.project, github_data='{}')
         self.job.save()
 
         ea = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_XML)
-        ea.save()
 
         self.job.record_action_start(self.action)
         cover_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -89,18 +84,15 @@ class TestXUnitOutput(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
 
         self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.job = Job(project=self.project, github_data='{}')
         self.job.save()
 
         ea = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT)
-        ea.save()
 
         self.job.record_action_start(self.action)
         xunit_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -133,20 +125,16 @@ class TestExpectedOutput(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
 
         self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.ea = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT,
                 location='righthere')
-        self.ea.save()
 
         self.ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
                 location='rightnow')
-        self.ea2.save()
 
     def test_unicode(self):
         self.assertEqual(unicode(self.ea), u"Action 'TestAction' expects Xunit output")

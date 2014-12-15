@@ -18,27 +18,27 @@ from baleen.utils import (
         mkdir_p
         )
 from baleen.artifact.models import output_types, ActionOutput
-from baleen.action.models import Hook
 
 
 def parse_build_definition(bd):
     plan_type = bd.detect_plan_type()
     if plan_type == 'docker':
-        return DockerActionPlan(bd)
+        plan = DockerActionPlan(bd)
     else:
         return NotImplemented
+
+    return plan.formulate_plan()
 
 
 class ActionPlan(object):
 
-    """Is an iterator that returns BuildSteps"""
+    """Is an iterator that returns Actions """
 
     def __init__(self, build_definition):
         self.build_definition = build_definition
         self.current_index = -1
-        self.plan = self.parse_plan()
 
-    def parse_plan(self):
+    def formulate_plan(self):
         return NotImplemented
 
     def next(self):
@@ -50,13 +50,13 @@ class DockerActionPlan(object):
 
     """Is an iterator that returns BuildSteps"""
 
-    def parse_plan(self):
+    def formulate_plan(self):
         build_data = yaml.load(StringIO(self.build_definition))
 
         dependencies = build_data.get('depends', {})
         if dependencies:
             # Then check dependencies and create any missing projects.
-            #self.create_missing_projects
+            self.create_missing_projects()
             #self.trigger_dependency_builds
             #set up waiting_for if needed, and raise Exception
             pass
@@ -68,6 +68,55 @@ class DockerActionPlan(object):
             pass
 
         return [{ 'name': 'action1' }]
+
+    def wait_for_project(self, project):
+        """
+        Tracking when a project is waiting on another one to complete.
+
+        Need to remove all temporary hooks for a given project when that
+        project is synced with github (since dependencies may change).
+        """
+        pass
+
+    def get_and_create_projects(self, deps):
+        """
+        Deals with this part of the build definition:
+
+        depends:
+           rabbitmq:
+              src: "git@github.com:docker-systems/rabbitmq.git"
+              minhash: "deedbeef" # must have this commit
+              # image should be inferred from the baleen.yml of the src repo
+              # image: "docker.example.com/rabbitmq"
+              #tag: v0.1.1
+        """
+        projects = []
+        for d in deps:
+            src_repo = d.get('src')
+            # Check it is actually a repo as opposed to just an image that can
+            # be pulled from somewhere:
+            if src_repo is None:
+                continue
+
+            # check if a project is already using the repo
+
+            # create a new project if not
+            projects.append((p, d.get('minhash')))
+        return projects
+
+
+    def trigger_dependency_builds(self, projects):
+        # check which projects already have a successful build, and trigger builds
+        # for those that don't
+        for p, minhash in projects:
+            j = p.last_successful_job()
+
+            if j and p.commit_in_history(minhash, j.commit):
+                # We already have a successful job that is new enough
+                continue
+
+            from baleen.job.models import manual_run
+            manual_run(p)
 
 
 class ExpectedActionOutput(object):
@@ -248,7 +297,7 @@ class RemoteSSHAction(Action):
 
         response['hooks'] = self.send_event_hooks(response['code'], transport)
 
-        if self.outputs.keys().count() > 0:
+        if len(self.outputs.keys()) > 0:
             sftp = paramiko.SFTPClient.from_transport(transport)
             response['output'] = {}
             for o in self.expectedactionoutput_set.all():

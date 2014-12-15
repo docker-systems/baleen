@@ -1,7 +1,9 @@
 from django.db import models
+from django.utils.text import slugify
 
 from baleen.utils import ManagerWithFirstQuery
 from baleen.artifact.models import output_types, ActionOutput
+
 
 class Hook(models.Model):
     """
@@ -16,28 +18,20 @@ class Hook(models.Model):
             help_text="The event to watch for, can be anything.")
 
     # Email a user, a particular email address, or the commit author
-    email_user = models.ForeignKey('auth.User')
-    email_address = models.EmailField(max_length=255)
+    email_user = models.ForeignKey('auth.User', null=True, blank=True)
+    email_address = models.EmailField(max_length=255, null=True, blank=True)
     email_author = models.BooleanField(default=False)
     
     # Post details about the event
-    post_url = models.URLField()
+    post_url = models.URLField(default=None, null=True, blank=True)
+
+    trigger_build = models.ForeignKey('project.Project',
+            related_name='triggered_by',
+            null=True, blank=True)
+    one_off = models.BooleanField(default=False)
 
     def activate(self, *args, **kwargs):
         pass
-
-
-class WaitingFor(models.Model):
-    """
-    Define a model for tracking when a project is waiting on another
-    one to complete.
-
-    Need to remove all waitingfor objects for a project when the project
-    is synced with github.
-    """
-    project = models.ForeignKey('project.Project')
-    waiting_for = models.ForeignKey('action.BuildDefinition',
-            related_name='blocking_projects')
 
 
 class BuildDefinition(models.Model):
@@ -80,6 +74,7 @@ class ActionResult(models.Model):
     job = models.ForeignKey('job.Job')
 
     action = models.CharField(max_length=255)
+    action_slug = models.CharField(max_length=255, blank=True)
 
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True)
@@ -91,9 +86,10 @@ class ActionResult(models.Model):
     objects = ManagerWithFirstQuery()
 
     def __unicode__(self):
-        return "%s" % self.action.name
+        return "ActionResult for action %s in job %s" % (self.action, self.job.id)
 
     def save(self):
+        self.action_slug = slugify(unicode(self.action))
         super(ActionResult, self).save()
 
     @property

@@ -53,11 +53,13 @@ class RemoteSSHActionTest(BaseActionTest):
 
     @patch('paramiko.SSHClient')
     @patch('paramiko.SFTPClient')
+    @patch('gearman.GearmanClient')
     @patch('baleen.action.actions.RemoteSSHAction.fetch_output')
     @patch('baleen.action.actions.RemoteSSHAction._run_command')
-    def test_execute(self, run_mock, fetch_mock, sftp_mock, ssh_mock):
+    def test_execute(self, run_mock, fetch_mock, gearman_mock, sftp_mock, ssh_mock):
         stdout = StringIO()
         stderr = StringIO()
+        run_mock.return_value = {'code': 0}
 
         self.action.execute(stdout, stderr, None)
 

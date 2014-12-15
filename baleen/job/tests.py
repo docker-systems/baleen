@@ -138,6 +138,7 @@ class JobTest(TestCase):
     def test_view_html_coverage(self):
         ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
                 location='rightnow')
+        self.action.set_output(ea2)
 
         self.job.record_action_start(self.action)
         response = {

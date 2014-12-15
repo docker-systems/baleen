@@ -36,6 +36,7 @@ class Project(models.Model):
             help_text='URL to git repo')
     #scm_sync_success = models.BooleanField(default=False, editable=False,
             #help_text='Was the last attempt to sync with the SCM successful?')
+    creator = models.ForeignKey('auth.User', null=True)
 
     github_token = models.CharField(max_length=255, editable=False,
             help_text="The token for the URL that GitHub's post-receive hook will use")
@@ -89,6 +90,12 @@ class Project(models.Model):
     @property
     def project_dir(self):
         return re.sub(r'[^a-zA-Z0-9]',' ', self.name)
+
+    def commit_in_history(self, ancestor, current):
+        """
+        Return whether ancestor commit is in the commit history for current commit.
+        """
+        pass
 
     def sync_repo(self):
         # ensure BUILD_ROOT exists
@@ -168,6 +175,7 @@ class Project(models.Model):
         print "Marked %d jobs as done." % len(unfinished)
 
     def collect_all_authorized_keys(self, include_comments=True):
+        from baleen.action.actions import RemoteSSHAction
         all_hosts = {}
         for action in self.action_plan:
             if isinstance(action, RemoteSSHAction):

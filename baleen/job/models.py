@@ -10,21 +10,20 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 
 from baleen.action.models import ActionResult
-from baleen.action.actions import ExpectedActionOutput
 from baleen.artifact.models import ActionOutput, output_types
-
-from baleen.utils import ManagerWithFirstQuery
 
 from jsonfield import JSONField
 
 
-def manual_run(project, user):
+def manual_run(project, user=None):
     """ Manually instantiate a job for project """
     last_j = project.last_job()
     if last_j and last_j.github_data:
         blank_job = Job(project=last_j.project, github_data=last_j.github_data)
-    else:
+    elif user:
         blank_job = Job(project=project, manual_by=user)
+    else:
+        blank_job = Job(project=project, manual_by=project.creator)
     blank_job.save()
     blank_job.submit()
     return blank_job
@@ -34,6 +33,7 @@ class Job(models.Model):
     project = models.ForeignKey('project.Project')
     github_data = JSONField()
 
+    commit = models.CharField(max_length=255, null=True, blank=True)
     received_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
@@ -43,8 +43,6 @@ class Job(models.Model):
 
     rejected = models.BooleanField(default=False)
     worker_pid = models.IntegerField(null=True, blank=True)
-
-    objects = ManagerWithFirstQuery()
 
     def __unicode__(self):
         return "Job for '%s' at %s" % (self.project.name, unicode(self.received_at))

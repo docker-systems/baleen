@@ -34,7 +34,9 @@ def index(request):
 @login_required()
 def add(request):
     if request.method == 'POST':
-        form = ProjectForm(request.POST)
+        data = request.POST
+        data['creator'] = request.user.id
+        form = ProjectForm(data)
         if form.is_valid():
             project = form.save()
             flash(request, 'Project added OK')

@@ -5,9 +5,127 @@ from django.contrib.auth.models import User
 
 from mock import Mock, patch
 
-from baleen.project.models import Project
-from baleen.action.actions import Action, RemoteSSHAction, ExpectedActionOutput
+from baleen.action.actions import (
+        RemoteSSHAction, ExpectedActionOutput,
+        parse_build_definition,
+        ActionPlan,
+        DockerActionPlan
+        )
+
+from baleen.project.models import Project, BuildDefinition
 from baleen.artifact.models import output_types
+
+class ActionPlanTest(TestCase):
+
+    def setUp(self):
+        self.project = Project(name='TestProject')
+        self.project.save()
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
+        the_plan = ''
+        self.bd = BuildDefinition(project=self.project, plan_type='docker',
+                raw_plan=the_plan)
+        self.bd.save()
+
+    def test_parse_build_definition(self):
+        action_steps = parse_build_definition(self.bd)
+        self.assertEqual(action_steps, [], 'no action steps for blank plan')
+
+    def test_iterate_steps(self):
+        ap = ActionPlan(self.bd)
+        ap.plan = [1, 2, 3]
+        self.assertEqual([ap for step in ap], [1, 2, 3])
+
+
+class DockerActionPlanTest(TestCase):
+
+    def setUp(self):
+        self.project = Project(name='TestProject')
+        self.project.save()
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
+    def create_plan(self, the_plan):
+        self.bd = BuildDefinition(project=self.project, plan_type='docker',
+                raw_plan=the_plan)
+        self.bd.save()
+
+    def user_and_login(self):
+        self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
+        self.user.save()
+        self.client.login(username='bob', password='bob')
+
+    def test_formulate_blank_plan(self):
+        self.create_plan('')
+        ap = DockerActionPlan(self.bd)
+        action_steps = ap.formulate_plan()
+        self.assertEqual(action_steps, [], 'no action steps for blank plan')
+
+    def test_formulate_plan(self):
+        self.create_plan("""
+depends:
+    docker.example.com/db: git@github.com/docker-systems/example-db.git
+
+build:
+    docker.example.com/blah: .
+"""
+        )
+        ap = DockerActionPlan(self.bd)
+        action_steps = ap.formulate_plan()
+        self.assertEqual(action_steps, [
+                {
+                   'group': 'project',
+                   'action': 'create',
+                   'git': 'git@github.com/docker-systems/example-db.git',
+                   'project': 'db'
+                },
+                {
+                   'group': 'project',
+                   'action': 'sync',
+                   'project': 'db'
+                },
+                {
+                   'group': 'project',
+                   'action': 'build',
+                   'project': 'db'
+                },
+                {
+                   'group': 'docker',
+                   'action': 'build_image',
+                   'image': 'docker.example.com/blah',
+                   'project': 'blah'
+                },
+                {
+                   'group': 'docker',
+                   'action': 'test_with_fig',
+                   'figfile': 'fig_test.yml',
+                   'project': 'blah'
+                },
+                {
+                   'group': 'docker',
+                   'action': 'get_build_artifact',
+                   'project': 'blah'
+                }
+                ], 'steps to build')
+
+
+
+class ExpectedActionOutputTest(TestCase):
+
+    def setUp(self):
+        self.project = Project(name='TestProject')
+        self.project.save()
+        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
+    def test_unicode(self):
+        ea = ExpectedActionOutput('an action', 'CH')
+        self.assertEqual(unicode(ea), "Action 'an action' expects '' output")
+
+    def test_output_type_display(self):
+        ea = ExpectedActionOutput('an action', 'CH')
+        self.assertEqual(ea.get_output_type_display(), "CVOVOVOV")
 
 
 class BaseActionTest(TestCase):

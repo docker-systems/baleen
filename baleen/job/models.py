@@ -9,7 +9,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils.timezone import now
 
-from baleen.action.models import ActionResult
 from baleen.artifact.models import ActionOutput, output_types
 
 from jsonfield import JSONField
@@ -53,11 +52,13 @@ class Job(models.Model):
         gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'job': self.id}), background=True)
 
     def record_action_start(self, action):
+        from baleen.project.models import ActionResult
         a = ActionResult(action=action, job=self, started_at=now())
         a.save()
         return a
 
     def record_action_response(self, action, response):
+        from baleen.project.models import ActionResult
         a = ActionResult.objects.get(action=action, job=self)
 
         a.status_code = response.get('code')

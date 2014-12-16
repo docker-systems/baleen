@@ -52,7 +52,7 @@ class ActionOutput(models.Model):
     `data` fields (e.g. parsing xml stored in the output and putting a summary
     in the)
     """
-    action_result = models.ForeignKey('action.ActionResult')
+    action_result = models.ForeignKey('project.ActionResult')
     
     output_type = models.CharField(max_length=2,
             choices=output_types.DETAILS,

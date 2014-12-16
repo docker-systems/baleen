@@ -5,8 +5,10 @@ from django.contrib.auth.models import User
 
 from mock import Mock, patch
 
-from baleen.action.actions import (
-        RemoteSSHAction, ExpectedActionOutput,
+from baleen.action.ssh import RemoteSSHAction
+
+from baleen.action import (
+        ExpectedActionOutput,
         parse_build_definition,
         ActionPlan,
         DockerActionPlan
@@ -120,12 +122,12 @@ class ExpectedActionOutputTest(TestCase):
                 username='foo', command='echo "blah"')
 
     def test_unicode(self):
-        ea = ExpectedActionOutput('an action', 'CH')
-        self.assertEqual(unicode(ea), "Action 'an action' expects '' output")
+        ea = ExpectedActionOutput(self.action, 'CH')
+        self.assertEqual(unicode(ea), "Action 'TestAction' expects Coverage HTML report output")
 
     def test_output_type_display(self):
-        ea = ExpectedActionOutput('an action', 'CH')
-        self.assertEqual(ea.get_output_type_display(), "CVOVOVOV")
+        ea = ExpectedActionOutput(self.action, 'CH')
+        self.assertEqual(ea.get_output_type_display(), "Coverage HTML report")
 
 
 class BaseActionTest(TestCase):
@@ -172,8 +174,8 @@ class RemoteSSHActionTest(BaseActionTest):
     @patch('paramiko.SSHClient')
     @patch('paramiko.SFTPClient')
     @patch('gearman.GearmanClient')
-    @patch('baleen.action.actions.RemoteSSHAction.fetch_output')
-    @patch('baleen.action.actions.RemoteSSHAction._run_command')
+    @patch('baleen.action.ssh.RemoteSSHAction.fetch_output')
+    @patch('baleen.action.ssh.RemoteSSHAction._run_command')
     def test_execute(self, run_mock, fetch_mock, gearman_mock, sftp_mock, ssh_mock):
         stdout = StringIO()
         stderr = StringIO()
@@ -203,9 +205,9 @@ class RemoteSSHActionTest(BaseActionTest):
         self.assertEqual(stdout.getvalue(), 'blah'*2)
         self.assertEqual(stderr.getvalue(), 'argh'*3)
 
-    @patch('baleen.action.actions.make_tarfile')
-    @patch('baleen.action.actions.mkdir_p')
-    @patch('baleen.action.actions.S_ISDIR')
+    @patch('baleen.action.ssh.make_tarfile')
+    @patch('baleen.action.ssh.mkdir_p')
+    @patch('baleen.action.ssh.S_ISDIR')
     def test_fetch(self, ISDIR, mkdir_p, make_tarfile):
         m = Mock()
         m.normalize.return_value = 'robots'
@@ -226,7 +228,7 @@ class RemoteSSHActionTest(BaseActionTest):
         self.assertEqual(self.action.fetch_output(self.ea, m), None)
         self.assertTrue(mkdir_p.call_args[0][0] in make_tarfile.call_args[0][0])
 
-    @patch('baleen.action.actions.S_ISDIR')
+    @patch('baleen.action.ssh.S_ISDIR')
     @patch('os.mkdir')
     def test_copy_dir(self, mkdir, ISDIR):
         m = Mock()

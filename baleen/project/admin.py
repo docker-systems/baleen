@@ -1,7 +1,6 @@
 from django.contrib import admin
 
-from baleen.project.models import Project
-from baleen.action.models import ActionResult, BuildDefinition
+from baleen.project.models import Project, ActionResult, BuildDefinition
 from baleen.artifact.models import ActionOutput
 
 

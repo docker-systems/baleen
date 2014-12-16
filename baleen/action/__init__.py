@@ -108,7 +108,7 @@ class DockerActionPlan(ActionPlan):
         dependencies = build_data.get('depends', {})
         if dependencies:
             # Then check dependencies and create any missing projects.
-            self.create_missing_projects()
+            self.get_and_create_projects(dependencies)
             #self.trigger_dependency_builds
             #set up waiting_for if needed, and raise Exception
             pass
@@ -171,8 +171,8 @@ class DockerActionPlan(ActionPlan):
               #tag: v0.1.1
         """
         projects = []
-        for d in deps:
-            src_repo = d.get('src')
+        for project_name, val in deps.items():
+            src_repo = val.get('src')
             # Check it is actually a repo as opposed to just an image that can
             # be pulled from somewhere:
             if src_repo is None:
@@ -181,7 +181,7 @@ class DockerActionPlan(ActionPlan):
             # check if a project is already using the repo
 
             # create a new project if not
-            projects.append((p, d.get('minhash')))
+            projects.append((project_name, val.get('minhash')))
         return projects
 
 
@@ -207,7 +207,7 @@ class ExpectedActionOutput(object):
     Linking ExpectedActionOutput allows for an action to also provide output
     in files or by other mechanisms.
 
-    - 'output_type' is a constant from baleen.action.models.output_types
+    - 'output_type' is a constant from baleen.artifact.models.output_types
       indicating the type of output.
     - 'location' indicates where the output is available. It's meaning depends
       on the action_type.

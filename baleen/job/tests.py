@@ -3,13 +3,13 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.utils.timezone import now
 
-from baleen.project.models import Project
+from baleen.project.models import Project, ActionResult
 from baleen.job.models import Job, manual_run
 from baleen.artifact.models import (
         output_types, ActionOutput
         )
-from baleen.action.actions import RemoteSSHAction, ExpectedActionOutput
-from baleen.action.models import ActionResult
+from baleen.action.ssh import RemoteSSHAction
+from baleen.action import ExpectedActionOutput
 
 from mock import patch, Mock
 

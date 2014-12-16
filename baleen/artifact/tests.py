@@ -5,7 +5,8 @@ from baleen.artifact.models import (
         CoverageXMLOutput
         )
 from baleen.project.models import Project
-from baleen.action.actions import RemoteSSHAction, ExpectedActionOutput
+from baleen.action.ssh import RemoteSSHAction
+from baleen.action import ExpectedActionOutput
 from baleen.job.models import Job
 
 from mock import Mock, patch

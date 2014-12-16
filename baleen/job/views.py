@@ -11,9 +11,8 @@ from sendfile import sendfile
 
 import json
 
-from baleen.project.models import Project
+from baleen.project.models import ActionResult
 from baleen.job.models import Job
-from baleen.action.models import ActionResult
 from baleen.artifact.models import CoverageHTMLOutput
 
 

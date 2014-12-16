@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 
 from baleen.project.models import Project
-from baleen.action.actions import RemoteSSHAction
+from baleen.action.ssh import RemoteSSHAction
 
 from mock import patch
 

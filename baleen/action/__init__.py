@@ -1,13 +1,20 @@
+import sys
 import yaml
 import gearman
 import json
+import logging
+import traceback
 
 from django.conf import settings
 from StringIO import StringIO
+from contextlib import closing
 
 from baleen.utils import statsd_label_converter
 from baleen.artifact.models import output_types
 from baleen.project.models import Project, Hook
+
+
+log = logging.getLogger('baleen.action')
 
 
 def parse_build_definition(bd):
@@ -24,6 +31,10 @@ def parse_build_definition(bd):
     return plan.formulate_plan()
 
 
+class ActionFailure(Exception):
+    pass
+
+
 class Action(object):
     """ Represents one of a series of actions that may be performed after a commit.
 
@@ -32,7 +43,7 @@ class Action(object):
     #abstract = True
 
     def __init__(self, project, name, index, *arg, **kwarg):
-        self.project = project
+        self.project = Project.objects.get(name=project)
         self.name = name
         self.index = index
         self.outputs = {}
@@ -53,6 +64,37 @@ class Action(object):
     def statsd_name(self):
         return statsd_label_converter(self.name)
 
+    def run(self, job=None):
+        log.info("Job %s - doing action: %s - %s" % (unicode(job.id), self.project.name, self.name))
+
+        out_f, err_f = job.get_live_job_filenames()
+
+        with closing(open(out_f, 'w')) as stdoutlog, closing(open(err_f, 'w')) as stderrlog: 
+            stdoutlog.write("Project=%s Action=%s\n" % (self.project.name, self.name))
+            stdoutlog.flush()
+
+            try:
+                # Record that an action is about to be run before executing it.
+                # This makes it easier to show actions in progress on the job details/status
+                # screens.
+                action_result = job.record_action_start(self)
+
+                response = self.execute(stdoutlog, stderrlog, action_result)
+            except Exception as e:
+                # Any exception that leaks from running the action has stuff recorded
+                # and is then raised to the caller
+                tb_str = traceback.format_exc(sys.exc_info()[2])
+                job.record_action_response(self, {
+                    'success': False,
+                    'message': str(e),
+                    'detail': tb_str 
+                })
+                raise ActionFailure(e)
+
+        job.record_action_response(self, response)
+
+        return response
+
     def execute(self, stdoutlog, stderrlog, action_result):
         """ Execute this Action
 
@@ -61,6 +103,10 @@ class Action(object):
 
         action_result is an action_result that will have already been created
         and saved to the db prior to this method being called.
+
+        Note that this is usually NOT called directly, it is called via "run".
+        "run" will setup the environment for the action to execute in, including
+        record ActionResult creation and log files.
         """
         return NotImplemented
 

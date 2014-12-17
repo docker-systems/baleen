@@ -133,12 +133,21 @@ class RunCommandAction(RemoteSSHAction):
         self.command = kwarg.get('command')
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        with closing(self.get_ssh_connection()) as ssh:
-            transport = ssh.get_transport()
+        try:
+            with closing(self.get_ssh_connection()) as ssh:
+                transport = ssh.get_transport()
 
-            response = self._run_command(self.command, transport,
-                    stdoutlog, stderrlog,
-                    action_result)
+                response = self._run_command(self.command, transport,
+                        stdoutlog, stderrlog,
+                        action_result)
+        except AuthenticationException:
+            job.record_action_response(action, {
+                'success': False,
+                'message': "Authentication failure. Have you checked the host's .ssh/authorized_keys2 is up to date?",
+            })
+            stdoutlog.close()
+            stderrlog.close()
+            raise ActionFailed()
         return response
 
     def _run_command(self, command, transport, stdoutlog=None, stderrlog=None, action_result=None):
@@ -203,6 +212,7 @@ class FetchFileAction(RemoteSSHAction):
         with closing(self.get_ssh_connection()) as ssh:
             transport = ssh.get_transport()
 
+            # TODO: catch sftp errors
             sftp = paramiko.SFTPClient.from_transport(transport)
 
             response = self.fetch_output(self.path_to_fetch, self.path_is_dir, sftp)

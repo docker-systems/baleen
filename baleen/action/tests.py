@@ -102,7 +102,6 @@ build:
         self.assertTrue(h)
 
 
-
 class ExpectedActionOutputTest(TestCase):
 
     def setUp(self):
@@ -247,4 +246,3 @@ class FetchFileActionTest(BaseActionTest):
         ISDIR.side_effect = [True, True, False, False, False]
         self.assertEqual(self.action.fetch_output(path, True, sftp_mock),
                 '/usr/local/baleen/baleen/../build_artifacts/rightnowCxzeI0')
-

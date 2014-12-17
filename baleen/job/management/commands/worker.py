@@ -14,6 +14,8 @@ from django.core.management.base import BaseCommand
 
 from baleen.job.models import Job
 from baleen.project.models import Project
+from baleen.action import ActionFailure
+from baleen.action.dispatch import get_action_object
 
 import statsd
 from statsd.counter import Counter
@@ -22,10 +24,6 @@ from statsd import Timer
 statsd.Connection.set_defaults(host='localhost', port=8125, sample_rate=1, disabled=True)
 
 gearman_worker = gearman.GearmanWorker([settings.GEARMAN_SERVER])
-
-
-class ActionFailed(Exception):
-    pass
 
 
 class Command(BaseCommand):
@@ -40,59 +38,17 @@ class Command(BaseCommand):
             ),
             make_option('-c', '--clear',
                 default=False,
-                action='store',
+                action='store_true',
                 dest='clear_jobs',
                 help="Clear all jobs in queue, don't run them."
             ),
+            make_option('-r', '--raw-plan',
+                default=None,
+                action='store',
+                dest='raw_plan',
+                help="Take a json file as the action plan, run it and exit"
+            ),
         )
-
-    def do_action(self, project, job, action):
-        print "Doing action: %s - %s" % (action.name, action.command)
-
-        out_f, err_f = job.get_live_job_filenames()
-        stdoutlog = open(out_f, 'w')
-        stderrlog = open(err_f, 'w')
-
-        stdoutlog.write("%s %s\n%s\n" % (project.name, action.name, action.command))
-        stdoutlog.flush()
-
-        try:
-            # Record that an action is about to be run before executing it.
-            # This makes it easier to show actions in progress on the job details/status
-            # screens.
-            action_result = job.record_action_start(action)
-            self.current_action = action
-
-            response = action.execute(stdoutlog, stderrlog, action_result)
-            # TODO: catch sftp errors
-        except AuthenticationException:
-            job.record_action_response(action, {
-                'success': False,
-                'message': "Authentication failure. Have you checked the host's .ssh/authorized_keys2 is up to date?",
-            })
-            stdoutlog.close()
-            stderrlog.close()
-            raise ActionFailed()
-        except Exception as e:
-            tb_str = traceback.format_exc(sys.exc_info()[2])
-            job.record_action_response(action, {
-                'success': False,
-                'message': str(e),
-                'detail': tb_str 
-            })
-            stdoutlog.close()
-            stderrlog.close()
-            raise ActionFailed()
-
-        stdoutlog.close()
-        stderrlog.close()
-
-        job.record_action_response(action, response)
-        self.current_action = None
-
-        if response['code']:
-            # If we got a non-zero exit status, then don't run any more actions
-            raise ActionFailed()
 
     def _reset_jobs(self):
         self.current_gearman_job = None
@@ -188,9 +144,16 @@ class Command(BaseCommand):
             try:
                 # record this process id so that we can kill it via the web interface
                 # supervisord will automatically create a replacement process.
-                self.do_action(job.project, job, action)
+                self.current_action = action
+                response = action.run(job)
+                self.current_action = None
+
+                if response['code']:
+                    # If we got a non-zero exit status, then don't run any more actions
+                    raise ActionFailure()
+
                 project_t.intermediate(action.statsd_name)
-            except ActionFailed:
+            except ActionFailure:
                 self._reset_jobs()
                 return ''
 
@@ -205,6 +168,12 @@ class Command(BaseCommand):
         # no-one would see the response anyway
         return ''
 
+    def process_plan(self, plan):
+        for step in plan:
+            action = get_action_object(step)
+
+            action.run()
+
 
     def handle(self, *args, **options):
         self.current_gearman_job = None
@@ -213,10 +182,15 @@ class Command(BaseCommand):
 
         self.worker_process_number = options['worker_number']
 
-        if options['clear_jobs']:
+        if options['raw_plan']:
+            with open(options['raw_plan']) as f:
+                plan_data = json.load(f)
+            self.process_plan(plan_data)
+        elif options['clear_jobs']:
             print "Removing all jobs in queue..."
             gearman_worker.register_task(settings.GEARMAN_JOB_LABEL, functools.partial(self.clear_job))
         else:
+            # Default is to wait for jobs
             gearman_worker.register_task(settings.GEARMAN_JOB_LABEL, functools.partial(self.run_task))
 
         signal(SIGTERM, self.clean_up)
@@ -224,7 +198,6 @@ class Command(BaseCommand):
 
         print "baleen worker reporting for duty, sir/m'am!"
         gearman_worker.work()
-
 
     def clear_job(self, worker, gm_job):
         job_id = json.loads(gm_job.data).get('job_id', None)

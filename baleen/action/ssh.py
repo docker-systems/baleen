@@ -1,12 +1,11 @@
 import time
-import json
 import os
 import paramiko
 import subprocess
 import tempfile
-import gearman
 
 from django.conf import settings
+from contextlib import closing
 
 from stat import S_ISDIR
 from StringIO import StringIO
@@ -21,15 +20,10 @@ from baleen.utils import (
         mkdir_p
         )
 
+
 class RemoteSSHAction(Action):
     """
-    Run a command on a remote host.
-
-    Output locations are presumed to be accessable via scp.
-
-    scp -v -f -- src_file
-
-    Output also includes ssh key pair to allow scp to work.
+    Abstract action to do something on a remote host with ssh access.
 
     TODO: There are some less than stellar security issues here:
     - the input from user is not sanitised, and it is used to
@@ -41,7 +35,8 @@ class RemoteSSHAction(Action):
       to the host. See the authorized_keys_entry property for more info and
       a possible way to restrict access while still allowing scp to function.
     """
-    ACTIONS = ('shell', 'fetch_file')
+    # Don't treat this as an actual action
+    abstract = True
 
     def __init__(self, project, name, index, *arg, **kwarg):
         super(RemoteSSHAction, self).__init__(project, name, index)
@@ -50,14 +45,6 @@ class RemoteSSHAction(Action):
         self.host = kwarg.get('host')
 
         self.private_key, self.public_key = self.get_key_pair()
-
-    def shell(self, **kwargs):
-        """ Runs a command on the remote server. """
-        command = kwargs.get('command')
-
-    def fetch_file(self, **kwargs):
-        """ Fetch a file from the remote server. """
-        filename = kwargs.get('path')
 
     def __unicode__(self):
         return "RemoteSSHAction: %s" % self.name
@@ -83,15 +70,18 @@ class RemoteSSHAction(Action):
         # host.
         #
         # TODO Need to escape double quotes!
-        action_command = '# ' + (self.name or '')
-        action_command += '\ncommand="%s",' % self.command
-        action_command += 'no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding %s' % self.public_key.value
-        return action_command
+        key_entry = '# ' + (self.name or '') + '\n'
+        # Can we reenable limiting the ssh command based on key? Need
+        # to differentiate between running a command and copying a file.
+        #action_command += '\ncommand="%s",' % self.command
+        key_entry += 'no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding %s' % self.public_key.value
+        return key_entry
 
     @property
     def host_address(self):
         """
-        This is a wrapper to extract the current lxc container ip lease
+        Resolve host into a valid address. Currently this is a wrapper to
+        extract the current lxc container ip lease.
         """
         if self.host and self.host.startswith('lxc:'):
             # This doesn't check that the LXC is actually running
@@ -107,7 +97,7 @@ class RemoteSSHAction(Action):
                 return stdout.strip()
         return self.host
 
-    def execute(self, stdoutlog, stderrlog, action_result):
+    def get_ssh_connection(self):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -119,66 +109,36 @@ class RemoteSSHAction(Action):
             look_for_keys = False,
         )
 
-        transport = ssh.get_transport()
-        response = self._run_command(self.command, transport,
-                stdoutlog, stderrlog,
-                action_result)
+        return ssh
 
-        response['hooks'] = self.send_event_hooks(response['code'], transport)
+    def as_form_data(self):
+        output = super(RemoteSSHAction, self).as_form_data()
 
-        if len(self.outputs.keys()) > 0:
-            sftp = paramiko.SFTPClient.from_transport(transport)
-            response['output'] = {}
-            for o in self.expectedactionoutput_set.all():
-                response['output'][o.output_type] = self.fetch_output(o, sftp)
+        output.update({
+                'username': self.username,
+                'command': self.command,
+                'host': self.host,
+                'authorized_keys_entry': self.authorized_keys_entry,
+                })
+        return output
 
-        ssh.close()
 
+class RunCommandAction(RemoteSSHAction):
+    label = 'run_command'
+
+    def __init__(self, *arg, **kwarg):
+        super(RunCommandAction, self).__init__(*arg, **kwarg)
+
+        self.command = kwarg.get('command')
+
+    def execute(self, stdoutlog, stderrlog, action_result):
+        with closing(self.get_ssh_connection()) as ssh:
+            transport = ssh.get_transport()
+
+            response = self._run_command(self.command, transport,
+                    stdoutlog, stderrlog,
+                    action_result)
         return response
-
-    def _copy_dir(self, sftp, src, dest):
-        file_list = sftp.listdir(path=src)
-        for f in file_list:
-            src_f = os.path.join(src,f)
-            dest_f = os.path.join(dest,f)
-            if S_ISDIR(sftp.stat(src_f).st_mode):
-                os.mkdir(os.path.join(dest,f))
-                self._copy_dir(sftp, src_f, dest_f)
-            sftp.get(remotepath=src_f, localpath=dest_f)
-
-    def fetch_output(self, o, sftp):
-        # Assume that default directory is home of the login user
-        location = o.location.replace('~', sftp.normalize('.'))
-
-        stat = sftp.stat(location)
-        if not stat:
-            return None
-
-        if o.output_type == output_types.COVERAGE_HTML:
-            assert S_ISDIR(stat.st_mode)
-            dest = tempfile.mkdtemp(prefix=os.path.split(location)[-1], dir=settings.HTMLCOV_DIR)
-            self._copy_dir(sftp, location, dest)
-            # create an archive in LXC's temp directory.
-            # Then the baleen webapp LXC uses watchdog to extract the archive to somewhere
-            # the webapp can serve them from.
-
-            # make staging dir if it doesn't exist, assumes worker will have permissions
-            mkdir_p(settings.HTMLCOV_LXC_STAGING_DIR)
-            # make archive
-            archive_path = os.path.join(
-                    settings.HTMLCOV_LXC_STAGING_DIR,
-                    os.path.basename(dest) + ".tar.gz")
-            make_tarfile(archive_path, dest)
-
-            return os.path.split(dest)[-1]
-        else:
-            if S_ISDIR(stat.st_mode):
-                return None
-            # to copy file from remote to local
-            f = sftp.open(location)
-            content = f.read()
-            f.close()
-            return content
 
     def _run_command(self, command, transport, stdoutlog=None, stderrlog=None, action_result=None):
         response = {'stdout': '', 'stderr': '', 'code': None}
@@ -221,22 +181,69 @@ class RemoteSSHAction(Action):
         response['code'] = chan.recv_exit_status()
         return response
 
-    def send_event_hooks(self, status_code, transport):
-        event = {
-            'type': 'action',
-            'name': self.name,
-            'status': status_code
-        }
-        gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
-        gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'event': event}), background=True)
 
-    def as_form_data(self):
-        output = super(RemoteSSHAction, self).as_form_data()
+class FetchFileAction(RemoteSSHAction):
+    """
+    Fetch a individual file or directory from a remote host.
 
-        output.update({
-                'username': self.username,
-                'command': self.command,
-                'host': self.host,
-                'authorized_keys_entry': self.authorized_keys_entry,
-                })
-        return output
+    Output locations are presumed to be accessable via scp.
+
+    scp -v -f -- src_file
+    """
+    label = 'fetch_file'
+
+    def __init__(self, *arg, **kwarg):
+        super(FetchFileAction, self).__init__(*arg, **kwarg)
+
+        self.path_to_fetch = kwarg.get('path')
+        self.path_is_dir = kwarg.get('is_dir')
+
+    def execute(self, stdoutlog, stderrlog, action_result):
+        with closing(self.get_ssh_connection()) as ssh:
+            transport = ssh.get_transport()
+
+            sftp = paramiko.SFTPClient.from_transport(transport)
+
+            response = self.fetch_output(self.path_to_fetch, self.path_is_dir, sftp)
+        return response
+
+    def _copy_dir(self, sftp, src, dest):
+        file_list = sftp.listdir(path=src)
+        for f in file_list:
+            src_f = os.path.join(src,f)
+            dest_f = os.path.join(dest,f)
+            if S_ISDIR(sftp.stat(src_f).st_mode):
+                os.mkdir(os.path.join(dest,f))
+                self._copy_dir(sftp, src_f, dest_f)
+            sftp.get(remotepath=src_f, localpath=dest_f)
+
+    def fetch_output(self, p, is_dir, sftp):
+        # Assume that default directory is home of the login user
+        location = p.replace('~', sftp.normalize('.'))
+
+        stat = sftp.stat(location)
+        if not stat:
+            return None
+
+        # manually split instead of using python os.path.basename because
+        # might be a dir with trailing slash
+        basename = os.path.split(location)[-1]
+        dest = tempfile.mkdtemp(prefix=basename, dir=settings.ARTIFACT_DIR)
+
+        if is_dir:
+            assert S_ISDIR(stat.st_mode)
+            self._copy_dir(sftp, location, dest)
+            local_path = dest
+        else:
+            if S_ISDIR(stat.st_mode):
+                return None
+            local_path = os.path.join(dest, basename)
+            sftp.get(remotepath=location, localpath=local_path)
+
+            # Code to read the file directly:
+            ## to copy file from remote to local
+            #f = sftp.open(location)
+            #content = f.read()
+            #f.close()
+            #return content
+        return local_path

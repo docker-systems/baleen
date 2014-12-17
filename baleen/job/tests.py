@@ -13,6 +13,7 @@ from baleen.action import ExpectedActionOutput
 
 from mock import patch, Mock
 
+
 class JobTest(TestCase):
 
     def setUp(self):

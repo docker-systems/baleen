@@ -37,7 +37,7 @@ class ActionPlanTest(TestCase):
     def test_iterate_steps(self):
         ap = ActionPlan(self.bd)
         ap.plan = [1, 2, 3]
-        self.assertEqual([ap for step in ap], [1, 2, 3])
+        self.assertEqual([step for step in ap], [1, 2, 3])
 
 
 class DockerActionPlanTest(TestCase):
@@ -67,7 +67,9 @@ class DockerActionPlanTest(TestCase):
     def test_formulate_plan(self):
         self.create_plan("""
 depends:
-    docker.example.com/db: git@github.com/docker-systems/example-db.git
+    docker.example.com/db:
+        src: git@github.com/docker-systems/example-db.git"
+        minhash: "deedbeef"
 
 build:
     docker.example.com/blah: .

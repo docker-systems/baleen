@@ -180,10 +180,7 @@ NOSE_PLUGINS = [
 ]
 
 SENDFILE_BACKEND = 'sendfile.backends.xsendfile'
-HTMLCOV_DIR = os.path.join(PROJECT_DIR, 'htmlcov_projects')
-
-# Some convolution is required to get the htmlcov from the worker to the webapp
-HTMLCOV_LXC_STAGING_DIR = '/var/lib/lxc/baleen/rootfs/var/local/baleen/htmlcov_projects'
+HTMLCOV_DIR = os.path.join(PROJECT_DIR, 'build_artifacts')
 
 BUILD_ROOT = '/var/lib/baleen/'
 

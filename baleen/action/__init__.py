@@ -1,5 +1,8 @@
 import yaml
+import gearman
+import json
 
+from django.conf import settings
 from StringIO import StringIO
 
 from baleen.utils import statsd_label_converter
@@ -24,6 +27,9 @@ class Action(object):
     """ Represents one of a series of actions that may be performed after a commit.
 
     """
+    # By default Action base class is not loaded.
+    #abstract = True
+
     def __init__(self, project, name, index, *arg, **kwarg):
         self.project = project
         self.name = name
@@ -33,30 +39,35 @@ class Action(object):
     def __unicode__(self):
         return "Action: %s" % self.name
 
-    def null_action(self, **kwargs):
-        """ This is an example for how to implement an Action.
-        
-        Actions will receive their extra parameters in kwargs.
-
-        Actions are expected to return an ActionResult.
-        """
-        
+    def send_event_hooks(self, status):
+        event = {
+            'type': 'action',
+            'name': self.name,
+            'status': status
+        }
+        gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
+        gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'event': event}), background=True)
 
     @property
     def statsd_name(self):
         return statsd_label_converter(self.name)
 
     def execute(self, stdoutlog, stderrlog, action_result):
+        """ Execute this Action
+
+        The stdoutlog and stderrlog are file handles for stdout and
+        stderr, if you want to record things to a log.
+
+        action_result is an action_result that will have already been created
+        and saved to the db prior to this method being called.
+        """
         return NotImplemented
 
     def set_output(self, output):
         self.outputs[output.output_type] = output
 
-    def fetch_output(self, o, sftp):
-        return NotImplemented
-
     def as_form_data(self):
-        output = {
+        data = {
                 'id': self.id,
                 'name': self.name,
                 'project': self.project.id,
@@ -65,11 +76,11 @@ class Action(object):
         for output_type, output_full_name in output_types.DETAILS:
             if output_type in output_types.IMPLICIT:
                 continue
-            output['output_' + output_type] = ''
+            data['output_' + output_type] = ''
             o = self.outputs.get(output_type)
             if o:
-                output['output_' + output_type] = o.location
-        return output
+                data['output_' + output_type] = o.location
+        return data
 
     def values_without_keys(self):
         data = dict(self.values)
@@ -91,9 +102,15 @@ class ActionPlan(object):
     def formulate_plan(self):
         return NotImplemented
 
+    def __iter__(self):
+        return self
+
     def next(self):
         self.current_index += 1
-        return self.plan[self.current_index]
+        try:
+            return self.plan[self.current_index]
+        except IndexError:
+            raise StopIteration
 
 
 class DockerActionPlan(ActionPlan):
@@ -119,35 +136,42 @@ class DockerActionPlan(ActionPlan):
             #DockerAction()
             pass
 
-        return [
+        self.plan = [
                 {
-                   'action': 'create_project',
+                   'group': 'project',
+                   'action': 'create',
                    'git': 'git@github.com/docker-systems/example-db.git',
                    'project': 'db'
                 },
                 {
-                   'action': 'sync_project',
+                   'group': 'project',
+                   'action': 'sync',
                    'project': 'db'
                 },
                 {
-                   'action': 'build_project',
+                   'group': 'project',
+                   'action': 'build',
                    'project': 'db'
                 },
                 {
-                   'action': 'build_docker_image',
+                   'group': 'docker',
+                   'action': 'build_image',
                    'image': 'docker.example.com/blah',
                    'project': 'blah'
                 },
                 {
-                   'action': 'test_docker_image_with_fig',
+                   'group': 'docker',
+                   'action': 'test_with_fig',
                    'figfile': 'fig_test.yml',
                    'project': 'blah'
                 },
                 {
-                   'action': 'get_container_artifact',
+                   'group': 'docker',
+                   'action': 'get_build_artifact',
                    'project': 'blah'
                 }
                 ]
+        return self.plan
 
     def wait_for_project(self, project):
         """
@@ -228,3 +252,4 @@ class ExpectedActionOutput(object):
         res = [x[1] for x in output_types.DETAILS if x[0] == self.output_type]
         if res:
             return res[0]
+

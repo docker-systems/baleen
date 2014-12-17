@@ -1,6 +1,7 @@
 from StringIO import StringIO
 
 from django.test import TestCase
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from mock import Mock, patch
@@ -153,6 +154,12 @@ class ActionTest(BaseActionTest):
         self.action.name = 'test something    now'
         self.assertEqual(self.action.statsd_name, 'test_something_now')
 
+    def test_load_action_map(self):
+        from baleen.action.dispatch import _load_action_map
+        action_map = _load_action_map()
+        for m in settings.ACTION_MODULES:
+            self.assertIn(m, action_map)
+
 
 class RunCommandActionTest(BaseActionTest):
 
@@ -169,7 +176,7 @@ class RunCommandActionTest(BaseActionTest):
     @patch('paramiko.SFTPClient')
     @patch('gearman.GearmanClient')
     @patch('baleen.action.ssh.RunCommandAction._run_command')
-    def test_execute(self, run_mock, fetch_mock, gearman_mock, sftp_mock, ssh_mock):
+    def test_execute(self, run_mock, gearman_mock, sftp_mock, ssh_mock):
         stdout = StringIO()
         stderr = StringIO()
         run_mock.return_value = {'code': 0}
@@ -246,4 +253,4 @@ class FetchFileActionTest(BaseActionTest):
         sftp_mock = Mock()
         sftp_mock.listdir.return_value = ['file1', 'file2']
         ISDIR.return_value = False
-        self.action.fetch_output(sftp_mock, 'a', 'b')
+        self.action.fetch_output('adir', True, sftp_mock)

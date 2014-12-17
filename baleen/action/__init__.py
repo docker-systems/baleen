@@ -7,6 +7,7 @@ from StringIO import StringIO
 
 from baleen.utils import statsd_label_converter
 from baleen.artifact.models import output_types
+from baleen.project.models import Project, Hook
 
 
 def parse_build_definition(bd):
@@ -100,6 +101,11 @@ class ActionPlan(object):
         self.plan = []
 
     def formulate_plan(self):
+        """ Return a list of Actions.  """
+        return NotImplemented
+
+    def is_blocked(self):
+        """ Return whether we are waiting for another dependency to be resolved.  """
         return NotImplemented
 
     def __iter__(self):
@@ -119,16 +125,24 @@ class DockerActionPlan(ActionPlan):
 
     def formulate_plan(self):
         build_data = yaml.load(StringIO(self.build_definition.raw_plan))
+        current_project = self.build_definition.project
 
         if build_data is None:
             return []
         dependencies = build_data.get('depends', {})
-        if dependencies:
-            # Then check dependencies and create any missing projects.
-            self.get_and_create_projects(dependencies)
-            #self.trigger_dependency_builds
-            #set up waiting_for if needed, and raise Exception
-            pass
+
+        # check dependencies
+        if dependencies and not self.dependencies_ok(dependencies):
+            # create any missing projects, and build them
+            dependent_project, plan = self.next_dependency_plan(dependencies)
+
+            # set up a trigger for when dependent_project has built
+            h = Hook(project=dependent_project, trigger_build=current_project)
+            h.save()
+
+            # TODO: Need to remove all temporary hooks for a given project when that
+            # project is synced with github (since dependencies may change).
+            return plan
 
         containers_to_build_and_test = build_data['build']
 
@@ -136,23 +150,14 @@ class DockerActionPlan(ActionPlan):
             #DockerAction()
             pass
 
-        self.plan = [
-                {
-                   'group': 'project',
-                   'action': 'create',
-                   'git': 'git@github.com/docker-systems/example-db.git',
-                   'project': 'db'
-                },
-                {
-                   'group': 'project',
-                   'action': 'sync',
-                   'project': 'db'
-                },
-                {
-                   'group': 'project',
-                   'action': 'build',
-                   'project': 'db'
-                },
+        # in the case of any missing projects, the plan returned is one to
+        # create/fetch/build one of the dependencies first.
+        #
+        # whenever the dependencies are not satisfied, the plan will be to
+        # try and deal to the dependencies first, while creating a post-success
+        # hook waiting for them all.
+
+        plan = [
                 {
                    'group': 'docker',
                    'action': 'build_image',
@@ -171,19 +176,38 @@ class DockerActionPlan(ActionPlan):
                    'project': 'blah'
                 }
                 ]
-        return self.plan
+        return plan
 
-    def wait_for_project(self, project):
+    def dependencies_ok(self, dependencies):
+        for d in dependencies:
+            if not self.check_dependency(repo=d.get('src'), minhash=d.get('minhash')):
+                return False
+        return True
+
+    def check_dependency(self, repo, minhash=None):
+        """
+        Check if all project dependencies have a valid build.
+        """
+        try:
+            p = Project.objects.get(scm_url=repo)
+        except Project.DoesNotExist:
+            return False
+        j = p.last_successful_job()
+
+        if j:
+            if minhash:
+                if p.commit_in_history(minhash, j.commit):
+                    # We already have a successful job that is new enough
+                    return True
+            else:
+                return True
+
+        return False
+
+    def next_dependency_plan(self, dependencies):
         """
         Tracking when a project is waiting on another one to complete.
 
-        Need to remove all temporary hooks for a given project when that
-        project is synced with github (since dependencies may change).
-        """
-        pass
-
-    def get_and_create_projects(self, deps):
-        """
         Deals with this part of the build definition:
 
         depends:
@@ -194,8 +218,9 @@ class DockerActionPlan(ActionPlan):
               # image: "docker.example.com/rabbitmq"
               #tag: v0.1.1
         """
+
         projects = []
-        for project_name, val in deps.items():
+        for project_name, val in dependencies.items():
             src_repo = val.get('src')
             # Check it is actually a repo as opposed to just an image that can
             # be pulled from somewhere:
@@ -206,21 +231,31 @@ class DockerActionPlan(ActionPlan):
 
             # create a new project if not
             projects.append((project_name, val.get('minhash')))
-        return projects
 
+        # ONLY return a plan with steps if the project isn't already being
+        # built
+        example_plan = [
+                {
+                   'group': 'project',
+                   'action': 'create',
+                   'git': 'git@github.com/docker-systems/example-db.git',
+                   'project': 'db'
+                },
+                {
+                   'group': 'project',
+                   'action': 'sync',
+                   'project': 'db'
+                },
+                {
+                   'group': 'project',
+                   'action': 'build',
+                   'project': 'db'
+                },
+                ]
+        print(example_plan)
 
-    def trigger_dependency_builds(self, projects):
-        # check which projects already have a successful build, and trigger builds
-        # for those that don't
-        for p, minhash in projects:
-            j = p.last_successful_job()
-
-            if j and p.commit_in_history(minhash, j.commit):
-                # We already have a successful job that is new enough
-                continue
-
-            from baleen.job.models import manual_run
-            manual_run(p)
+        #return dependent_project, plan
+        return None, []
 
 
 class ExpectedActionOutput(object):

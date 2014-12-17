@@ -80,7 +80,7 @@ class Project(models.Model):
             # The revision control url changed, we need to fire a task to
             # checkout the code and configure based on the baleen.yml
             # (unless manual_config=True)
-            do_clone = True
+            do_clone = Trues
         super(Project, self).save()
         if do_clone:
             gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])

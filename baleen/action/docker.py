@@ -1,5 +1,6 @@
 from baleen.action import Action
 
+
 class FigAction(Action):
 
     def __init__(self, project, name, index, *arg, **kwarg):
@@ -13,7 +14,3 @@ class FigAction(Action):
         pass
 
 
-class ProjectAction(Action):
-    ACTIONS = ('create', 'sync', 'build')
-
-    pass

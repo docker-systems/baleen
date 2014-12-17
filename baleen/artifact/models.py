@@ -125,7 +125,7 @@ class CoverageHTMLOutput(ActionOutput):
         super(CoverageHTMLOutput, self).save()
 
     def get_coverage_html_dir(self):
-        return os.path.join(settings.HTMLCOV_DIR, self.output)
+        return os.path.join(settings.ARTIFACT_DIR, self.output)
 
     class Meta:
         proxy = True

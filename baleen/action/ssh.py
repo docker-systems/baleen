@@ -16,7 +16,6 @@ from baleen.artifact.models import output_types, ActionOutput
 
 from baleen.utils import (
         generate_ssh_key,
-        make_tarfile,
         mkdir_p
         )
 
@@ -126,6 +125,8 @@ class RemoteSSHAction(Action):
 class RunCommandAction(RemoteSSHAction):
     label = 'run_command'
 
+    STREAM_BUFFER_SIZE = 1048576
+
     def __init__(self, *arg, **kwarg):
         super(RunCommandAction, self).__init__(*arg, **kwarg)
 
@@ -146,8 +147,6 @@ class RunCommandAction(RemoteSSHAction):
         chan = transport.open_session()
         chan.exec_command(command)
 
-        buff_size = 1048576
-
         a_stdout = ActionOutput(action_result=action_result,
                 output_type=output_types.STDOUT) if action_result else None
         a_stderr = ActionOutput(action_result=action_result,
@@ -164,6 +163,8 @@ class RunCommandAction(RemoteSSHAction):
                 action_output.output += data
                 action_output.save()
             return data
+
+        buff_size = self.STREAM_BUFFER_SIZE
 
         while not chan.exit_status_ready():
             time.sleep(1)
@@ -195,8 +196,8 @@ class FetchFileAction(RemoteSSHAction):
     def __init__(self, *arg, **kwarg):
         super(FetchFileAction, self).__init__(*arg, **kwarg)
 
-        self.path_to_fetch = kwarg.get('path')
-        self.path_is_dir = kwarg.get('is_dir')
+        self.path_to_fetch = kwarg['path']
+        self.path_is_dir = kwarg.get('is_dir', False)
 
     def execute(self, stdoutlog, stderrlog, action_result):
         with closing(self.get_ssh_connection()) as ssh:

@@ -8,7 +8,7 @@ from baleen.job.models import Job, manual_run
 from baleen.artifact.models import (
         output_types, ActionOutput
         )
-from baleen.action.ssh import RemoteSSHAction
+from baleen.action.ssh import RunCommandAction
 from baleen.action import ExpectedActionOutput
 
 from mock import patch, Mock
@@ -20,7 +20,7 @@ class JobTest(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
@@ -189,7 +189,7 @@ class JobTemplateTagsTest(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')

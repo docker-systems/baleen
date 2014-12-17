@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 
 from mock import Mock, patch
 
-from baleen.action.ssh import RemoteSSHAction
+from baleen.action.ssh import RunCommandAction, FetchFileAction
 
 from baleen.action import (
         ExpectedActionOutput,
@@ -22,7 +22,7 @@ class ActionPlanTest(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         the_plan = ''
@@ -45,7 +45,7 @@ class DockerActionPlanTest(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
     def create_plan(self, the_plan):
@@ -120,7 +120,7 @@ class ExpectedActionOutputTest(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
     def test_unicode(self):
@@ -137,7 +137,7 @@ class BaseActionTest(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
@@ -154,15 +154,7 @@ class ActionTest(BaseActionTest):
         self.assertEqual(self.action.statsd_name, 'test_something_now')
 
 
-class RemoteSSHActionTest(BaseActionTest):
-
-    def setUp(self):
-        super(RemoteSSHActionTest, self).setUp()
-        self.ea = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT,
-                location='righthere')
-
-        self.ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
-                location='rightnow')
+class RunCommandActionTest(BaseActionTest):
 
     def test_authorized_keys_entry(self):
         keys = self.action.authorized_keys_entry
@@ -176,8 +168,7 @@ class RemoteSSHActionTest(BaseActionTest):
     @patch('paramiko.SSHClient')
     @patch('paramiko.SFTPClient')
     @patch('gearman.GearmanClient')
-    @patch('baleen.action.ssh.RemoteSSHAction.fetch_output')
-    @patch('baleen.action.ssh.RemoteSSHAction._run_command')
+    @patch('baleen.action.ssh.RunCommandAction._run_command')
     def test_execute(self, run_mock, fetch_mock, gearman_mock, sftp_mock, ssh_mock):
         stdout = StringIO()
         stderr = StringIO()
@@ -207,34 +198,52 @@ class RemoteSSHActionTest(BaseActionTest):
         self.assertEqual(stdout.getvalue(), 'blah'*2)
         self.assertEqual(stderr.getvalue(), 'argh'*3)
 
-    @patch('baleen.action.ssh.make_tarfile')
+
+class FetchFileActionTest(BaseActionTest):
+
+    def setUp(self):
+        super(FetchFileActionTest, self).setUp()
+        self.action = FetchFileAction(project=self.project, index=0, name='TestAction',
+                username='foo', path='/rightnow')
+
+        self.dir_action = FetchFileAction(project=self.project, index=0, name='TestAction',
+                username='foo', path='/rightnow/', is_dir=True)
+
     @patch('baleen.action.ssh.mkdir_p')
     @patch('baleen.action.ssh.S_ISDIR')
-    def test_fetch(self, ISDIR, mkdir_p, make_tarfile):
-        m = Mock()
-        m.normalize.return_value = 'robots'
-        self.assertEqual(self.action.fetch_output(self.ea, m), None)
+    def test_fetch_output(self, ISDIR, mkdir_p):
+        ssh_mock = Mock()
+        ssh_mock.normalize.return_value = 'robots'
+        path = '/rightnow'
+
+        self.assertEqual(self.action.fetch_output(path, False, ssh_mock), None)
 
         ISDIR.return_value = True
-        self.assertEqual(self.action.fetch_output(self.ea, m), None)
+        self.assertEqual(self.action.fetch_output(path, True, ssh_mock), None)
+
         ISDIR.return_value = False
-        m.open.return_value.read.return_value = 'test'
-        self.assertEqual(self.action.fetch_output(self.ea, m), 'test')
+        self.assertEqual(self.action.fetch_output(path, False, ssh_mock), 'test')
 
-        m.listdir.return_value = []
+        ssh_mock.listdir.return_value = []
         ISDIR.return_value = True
-        self.assertTrue('rightnow' in self.action.fetch_output(self.ea2, m))
-        self.assertTrue(mkdir_p.call_args[0][0] in make_tarfile.call_args[0][0])
+        self.assertTrue('rightnow' in self.action.fetch_output(path, True, ssh_mock))
 
-        m.stat.return_value = None
-        self.assertEqual(self.action.fetch_output(self.ea, m), None)
-        self.assertTrue(mkdir_p.call_args[0][0] in make_tarfile.call_args[0][0])
+        ssh_mock.stat.return_value = None
+        self.assertEqual(self.action.fetch_output(path, False, ssh_mock), None)
 
     @patch('baleen.action.ssh.S_ISDIR')
     @patch('os.mkdir')
     def test_copy_dir(self, mkdir, ISDIR):
-        m = Mock()
-        m.listdir.return_value = ['file1', 'file2']
+        sftp_mock = Mock()
+        sftp_mock.listdir.return_value = ['file1', 'file2']
         ISDIR.return_value = False
-        self.action._copy_dir(m, 'a', 'b')
-        self.assertTrue(m.get.called)
+        self.action._copy_dir(sftp_mock, 'a', 'b')
+        self.assertTrue(sftp_mock.get.called)
+
+    @patch('baleen.action.ssh.S_ISDIR')
+    @patch('os.mkdir')
+    def test_fetch_dir(self, mkdir, ISDIR):
+        sftp_mock = Mock()
+        sftp_mock.listdir.return_value = ['file1', 'file2']
+        ISDIR.return_value = False
+        self.action.fetch_output(sftp_mock, 'a', 'b')

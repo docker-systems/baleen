@@ -136,6 +136,10 @@ class DockerActionPlan(ActionPlan):
             # create any missing projects, and build them
             dependent_project, plan = self.next_dependency_plan(dependencies)
 
+            if dependent_project is None:
+                # TODO: raise an error
+                return []
+
             # set up a trigger for when dependent_project has built
             h = Hook(project=dependent_project, trigger_build=current_project)
             h.save()
@@ -179,7 +183,7 @@ class DockerActionPlan(ActionPlan):
         return plan
 
     def dependencies_ok(self, dependencies):
-        for d in dependencies:
+        for d_name, d in dependencies.iteritems():
             if not self.check_dependency(repo=d.get('src'), minhash=d.get('minhash')):
                 return False
         return True
@@ -252,7 +256,6 @@ class DockerActionPlan(ActionPlan):
                    'project': 'db'
                 },
                 ]
-        print(example_plan)
 
         #return dependent_project, plan
         return None, []

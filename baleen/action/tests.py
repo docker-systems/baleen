@@ -1,12 +1,12 @@
 from StringIO import StringIO
 
 from django.test import TestCase
-from django.conf import settings
 from django.contrib.auth.models import User
 
 from mock import Mock, patch
 
 from baleen.action.ssh import RunCommandAction, FetchFileAction
+from baleen.action.project import CreateProjectAction
 
 from baleen.action import (
         ExpectedActionOutput,
@@ -15,7 +15,7 @@ from baleen.action import (
         DockerActionPlan
         )
 
-from baleen.project.models import Project, BuildDefinition
+from baleen.project.models import Project, BuildDefinition, Hook
 from baleen.artifact.models import output_types
 
 class ActionPlanTest(TestCase):
@@ -78,6 +78,7 @@ build:
         )
         ap = DockerActionPlan(self.bd)
         action_steps = ap.formulate_plan()
+        # Will formulate plan to build dependency first.
         self.assertEqual(action_steps, [
                 {
                    'group': 'project',
@@ -94,25 +95,11 @@ build:
                    'group': 'project',
                    'action': 'build',
                    'project': 'db'
-                },
-                {
-                   'group': 'docker',
-                   'action': 'build_image',
-                   'image': 'docker.example.com/blah',
-                   'project': 'blah'
-                },
-                {
-                   'group': 'docker',
-                   'action': 'test_with_fig',
-                   'figfile': 'fig_test.yml',
-                   'project': 'blah'
-                },
-                {
-                   'group': 'docker',
-                   'action': 'get_build_artifact',
-                   'project': 'blah'
                 }
                 ], 'steps to build')
+        # check that a Hook exists
+        h = Hook.objects.get(trigger_build=self.project)
+        self.assertTrue(h)
 
 
 
@@ -154,11 +141,16 @@ class ActionTest(BaseActionTest):
         self.action.name = 'test something    now'
         self.assertEqual(self.action.statsd_name, 'test_something_now')
 
-    def test_load_action_map(self):
-        from baleen.action.dispatch import _load_action_map
-        action_map = _load_action_map()
-        for m in settings.ACTION_MODULES:
-            self.assertIn(m, action_map)
+    def test_get_action_object(self):
+        from baleen.action.dispatch import get_action_object
+        action = get_action_object({
+            'group': 'project',
+            'action': 'create_project',
+            'project': 'blah',
+            'name': 'build project',
+            'index': 0
+            })
+        self.assertTrue(isinstance(action, CreateProjectAction))
 
 
 class RunCommandActionTest(BaseActionTest):
@@ -218,25 +210,18 @@ class FetchFileActionTest(BaseActionTest):
 
     @patch('baleen.action.ssh.mkdir_p')
     @patch('baleen.action.ssh.S_ISDIR')
-    def test_fetch_output(self, ISDIR, mkdir_p):
-        ssh_mock = Mock()
-        ssh_mock.normalize.return_value = 'robots'
+    @patch('baleen.action.ssh.tempfile')
+    def test_fetch_output(self, tempfile_mock, ISDIR, mkdir_p):
+        sftp_mock = Mock()
+        sftp_mock.normalize.return_value = 'robots'
+        tempfile_mock.mkdtemp.return_value = 'blahtempdir'
         path = '/rightnow'
 
-        self.assertEqual(self.action.fetch_output(path, False, ssh_mock), None)
-
-        ISDIR.return_value = True
-        self.assertEqual(self.action.fetch_output(path, True, ssh_mock), None)
-
         ISDIR.return_value = False
-        self.assertEqual(self.action.fetch_output(path, False, ssh_mock), 'test')
+        self.assertEqual(self.action.fetch_output(path, False, sftp_mock), 'blahtempdir/rightnow')
 
-        ssh_mock.listdir.return_value = []
-        ISDIR.return_value = True
-        self.assertTrue('rightnow' in self.action.fetch_output(path, True, ssh_mock))
-
-        ssh_mock.stat.return_value = None
-        self.assertEqual(self.action.fetch_output(path, False, ssh_mock), None)
+        sftp_mock.stat.return_value = None
+        self.assertEqual(self.action.fetch_output(path, False, sftp_mock), None)
 
     @patch('baleen.action.ssh.S_ISDIR')
     @patch('os.mkdir')
@@ -251,6 +236,15 @@ class FetchFileActionTest(BaseActionTest):
     @patch('os.mkdir')
     def test_fetch_dir(self, mkdir, ISDIR):
         sftp_mock = Mock()
+        sftp_mock.normalize.return_value = 'robots'
         sftp_mock.listdir.return_value = ['file1', 'file2']
+        path = '/rightnow'
+
         ISDIR.return_value = False
-        self.action.fetch_output('adir', True, sftp_mock)
+        with self.assertRaises(AssertionError):
+            self.action.fetch_output(path, True, sftp_mock)
+
+        ISDIR.side_effect = [True, True, False, False, False]
+        self.assertEqual(self.action.fetch_output(path, True, sftp_mock),
+                '/usr/local/baleen/baleen/../build_artifacts/rightnowCxzeI0')
+

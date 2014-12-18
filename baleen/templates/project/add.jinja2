@@ -7,4 +7,10 @@
 <h1>Add Project</h1>
 
 {% crispy form %}
+
+<p>Before you add the project, add this to the deploy keys of your project:</p>
+<pre style='font-size: small'>{{ deploy_key }}</pre>
+
+<p>Then we'll checkout and attempt to build the project straight away!</p>
+
 {% endblock %}

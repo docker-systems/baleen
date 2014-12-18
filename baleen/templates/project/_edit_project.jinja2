@@ -10,7 +10,7 @@
             <a href="{{ github_site_url }}{{ project.github_push_url }}">{{ github_site_url }}{{ project.github_push_url }}</a>
         </p>
         <p>Add this to the deploy keys</p>
-        <pre style='font-size: small'>{{ project.public_key }}</pre>
+        <pre style='font-size: small'>{{ project.public_key.value }}</pre>
         <h3>SSH Access</h3>
         <div id="authorized_keys">
             {% with project.collect_all_authorized_keys as allkeys %}

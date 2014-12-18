@@ -54,6 +54,12 @@ def _load_action_map(ACTION_MODULES):
     """
     Load various modules that are expected to have subclasses of Action
 
+    There is a smell here I'd like to fix, where if you specify abstract=True
+    on an Action class, the subclasses will also appear to be abstract.
+
+    This might be resolvable using Python metaclass stuff, but that looks
+    like a fair bit of work to understand.
+
     >>> _load_action_map({'test': 'baleen.action.project'})['test'].keys()
     ['create_project', 'sync_project', 'build_project']
     """

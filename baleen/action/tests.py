@@ -32,7 +32,7 @@ class ActionPlanTest(TestCase):
         self.bd.save()
 
     def test_parse_build_definition(self):
-        action_steps = parse_build_definition(self.bd)
+        action_steps = parse_build_definition(self.project, self.bd)
         self.assertEqual(action_steps, [], 'no action steps for blank plan')
 
     def test_iterate_steps(self):

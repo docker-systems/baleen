@@ -4,24 +4,18 @@ from django.core.urlresolvers import reverse
 from django.utils.text import slugify
 
 import logging
-import subprocess
-import tempfile
 import json
-import os
-import stat
 import re
 import gearman
-
-from contextlib import closing
 
 from baleen.job.models import Job
 from baleen.artifact.models import output_types, ActionOutput
 
 from baleen.utils import (
         statsd_label_converter,
-        generate_ssh_key,
-        mkdir_p, cd,
-        generate_github_token
+        cd,
+        generate_github_token,
+        get_credential_key_pair
         )
 
 log = logging.getLogger('baleen.project')
@@ -53,8 +47,10 @@ class Project(models.Model):
 
     # Use this key pair for getting source from github
     # public_key should be pasted into the projects deploy keys
-    public_key = models.TextField(editable=False)
-    private_key = models.TextField(editable=False)
+    public_key = models.ForeignKey('Credential', null=True, blank=True,
+            related_name='public_key_for', on_delete=models.SET_NULL)
+    private_key = models.ForeignKey('Credential', null=True, blank=True,
+            related_name='private_key_for', on_delete=models.SET_NULL)
 
     def __init__(self, *args, **kwargs):
         super(Project, self).__init__(*args, **kwargs)
@@ -66,29 +62,38 @@ class Project(models.Model):
     def action_plan(self):
         from baleen.action import parse_build_definition
 
+        #bd = self.builddefinition_set.all().order_by('created_at').first()
         bd = self.builddefinition_set.all().order_by('commit').first()
-        if bd:
-            return parse_build_definition(bd.first())
-        return []
+        return parse_build_definition(self, bd)
 
     def save(self):
         do_clone = False
-        if self.pk is None:
+        if not self.github_token:
             self.github_token = generate_github_token()
-            self.private_key, self.public_key = generate_ssh_key()
+        if None in (self.public_key, self.private_key):
+            cred_name = 'deploykey_' + self.name
+            self.private_key, self.public_key = get_credential_key_pair(cred_name, self)
+
         if self._original_scm_url != self.scm_url:
             # The revision control url changed, we need to fire a task to
             # checkout the code and configure based on the baleen.yml
             # (unless manual_config=True)
-            do_clone = Trues
+            do_clone = True
+
         super(Project, self).save()
         if do_clone:
-            gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
-            gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps(
-                {
-                    'project': self.id,
-                    'generate_actions': True
-                }), background=True)
+            from baleen.job.models import manual_run
+            manual_run(self)
+            #gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
+            #gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps(
+                #{
+                    #'group': 'project',
+                    #'action': 'clone_repo',
+                    #'name': 'Clone repo for project %s' % self.name,
+                    #'index': 0,
+                    #'project': self.id,
+                    #'generate_actions': True
+                #}), background=True)
 
     @property
     def project_dir(self):
@@ -100,44 +105,6 @@ class Project(models.Model):
         """
         pass
 
-    def sync_repo(self):
-        # ensure BUILD_ROOT exists
-        mkdir_p(settings.BUILD_ROOT)
-
-        # This is a little complicated because we want to set up git to use
-        # the ssh key for this project. We do this by using the GIT_SSH environment
-        # variable, and dumping our private key to a temporary file (that only
-        # the current user can read/write)
-        fd, identity_fn = tempfile.mkstemp()
-        with closing(os.fdopen(fd, 'w')) as tf:
-            tf.write(self.private_key)
-
-        fd, git_ssh_fn = tempfile.mkstemp()
-        template = """#!/bin/bash\nssh -i %s $@\n"""
-        temp_git_wrap = template % identity_fn
-        with closing(os.fdopen(fd, 'w')) as tf:
-            tf.write(temp_git_wrap)
-
-        # temp file isn't executable by default
-        st = os.stat(git_ssh_fn)
-        os.chmod(git_ssh_fn, st.st_mode | stat.S_IEXEC)
-
-        os.environ['GIT_SSH'] = git_ssh_fn
-        
-        with cd(settings.BUILD_ROOT):
-            git_checkout = subprocess.Popen(
-                ["git", "clone", self.scm_url, self.project_dir],
-                stdout=subprocess.PIPE
-                ).stdout.read()
-        del os.environ['GIT_SSH']
-
-        # Clean up after outselves
-        os.remove(identity_fn)
-        os.remove(git_ssh_fn)
-
-        result = git_checkout.decode('utf-8')
-        log.debug('Git checkout stdout: %s' % result)
-
     def _raw_yaml(self):
         """ Read yaml file defining build """
         with cd(settings.BUILD_ROOT):
@@ -148,6 +115,7 @@ class Project(models.Model):
         return statsd_label_converter(self.name)
 
     def github_push_url(self):
+        print self.github_token
         return reverse('github_url', kwargs={'github_token': self.github_token} )
 
     def current_job(self):
@@ -180,7 +148,7 @@ class Project(models.Model):
     def collect_all_authorized_keys(self, include_comments=True):
         from baleen.action.ssh import RemoteSSHAction
         all_hosts = {}
-        for action in self.action_plan:
+        for action in self.action_plan():
             if isinstance(action, RemoteSSHAction):
                 user_and_host = (action.username, action.host)
                 all_hosts.setdefault(user_and_host,[])
@@ -200,11 +168,27 @@ class Credential(models.Model):
     They may be needed by project to run commands on remote hosts, with the
     value being an ssh key, or they may be usernames/passwords for the
     tested projects.
+
+    Credentials must be stored with User or Project.
+
+    ssh key credentials are added temporarily while creating new projects
+    to provide a better UX. e.g. when filling in details about the project, the
+    user can be prompted to add the public key to github straight away instead
+    waiting for a build to fail.
     """
-    project = models.ForeignKey('Project')
+    project = models.ForeignKey('Project', null=True)
+    user = models.ForeignKey('auth.User', null=True)
+    
     name = models.CharField(max_length=255)
     value = models.TextField(max_length=255)
     environment = models.BooleanField(default=False)
+
+    def __unicode__(self):
+        return "Credential: " + self.name
+
+    class Meta:
+        unique_together = (('project', 'name'),
+                           ('user', 'name'),)
 
 
 class Hook(models.Model):
@@ -244,7 +228,7 @@ class BuildDefinition(models.Model):
     It is used to generate an ActionPlan.
     """
     project = models.ForeignKey('project.Project')
-    #updated_at = models.DateTimeField(
+    #created_at = models.DateTimeField(
             #help_text='The source commit hash this build definition came from')
     commit = models.CharField(max_length=255, null=True, blank=True,
             help_text='The source commit hash this build definition came from')

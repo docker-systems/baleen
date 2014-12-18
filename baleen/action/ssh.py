@@ -14,10 +14,7 @@ from baleen.action import Action
 
 from baleen.artifact.models import output_types, ActionOutput
 
-from baleen.utils import (
-        generate_ssh_key,
-        mkdir_p
-        )
+from baleen.utils import get_credential_key_pair
 
 
 class RemoteSSHAction(Action):
@@ -43,25 +40,14 @@ class RemoteSSHAction(Action):
         self.username = kwarg.get('username')
         self.host = kwarg.get('host')
 
-        self.private_key, self.public_key = self.get_key_pair()
+        credential_name = '%s@%s' % (self.username, self.host)
+        self.private_key, self.public_key = get_credential_key_pair(
+                credential_name,
+                project=self.project
+                )
 
     def __unicode__(self):
         return "RemoteSSHAction: %s" % self.name
-
-    def get_key_pair(self):
-        from baleen.project.models import Credential
-
-        name = '%s@%s' % (self.username, self.host)
-        try:
-            priv = Credential.objects.get(project=self.project, name=name + '_private')
-            public = Credential.objects.get(project=self.project, name=name + '_public')
-        except Credential.DoesNotExist:
-            priv_key, public_key= generate_ssh_key()
-            priv = Credential(project=self.project, name=name + '_private', value=priv_key)
-            priv.save()
-            public = Credential(project=self.project, name=name + '_public', value=public_key)
-            public.save()
-        return priv, public
 
     @property
     def authorized_keys_entry(self):

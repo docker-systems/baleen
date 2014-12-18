@@ -13,6 +13,10 @@ RUN apt-get install -y libexpat1-dev libidn11-dev python-pip git \
         libyaml-dev gearman gearman-job-server
 RUN apt-get build-dep -y psycopg2
 
+# Need to freakin' have some hosts, because we run git without
+# a tty stdin, so can't accept the unknown host prompt
+RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
+
 # create working dir
 RUN mkdir -p /usr/local/baleen
 WORKDIR /usr/local/baleen

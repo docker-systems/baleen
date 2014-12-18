@@ -86,6 +86,7 @@ class Command(BaseCommand):
                 return self.sync_project(project_id)
             else:
                 return "Unknown task type"
+            print 'Task complete!'
         except Exception, e:
             print "Unexpected error:", sys.exc_info()[0]
             print str(e)
@@ -116,7 +117,7 @@ class Command(BaseCommand):
 
         self.current_baleen_job = job
 
-        actions = job.project.action_plan
+        actions = job.project.action_plan()
         print "Running job %s" % job_id
 
         # Only one job per project!  Until we have per-project queues,
@@ -145,7 +146,10 @@ class Command(BaseCommand):
                 # record this process id so that we can kill it via the web interface
                 # supervisord will automatically create a replacement process.
                 self.current_action = action
-                response = action.run(job)
+
+                print action
+                a = get_action_object(action)
+                response = a.run(job)
                 self.current_action = None
 
                 if response['code']:
@@ -171,7 +175,6 @@ class Command(BaseCommand):
     def process_plan(self, plan):
         for step in plan:
             action = get_action_object(step)
-
             action.run()
 
 

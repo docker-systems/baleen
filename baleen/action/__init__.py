@@ -17,16 +17,19 @@ from baleen.project.models import Project, Hook
 log = logging.getLogger('baleen.action')
 
 
-def parse_build_definition(bd):
+def parse_build_definition(project, bd):
     """
     Work out what kind of build definition we're working with and return
     the appropriate ActionPlan instance.
     """
-    plan_type = bd.detect_plan_type()
-    if plan_type == 'docker':
-        plan = DockerActionPlan(bd)
+    if bd is None:
+        plan = InitActionPlan(None, project=project)
     else:
-        return NotImplemented
+        plan_type = bd.detect_plan_type()
+        if plan_type == 'docker':
+            plan = DockerActionPlan(bd)
+        else:
+            return NotImplemented
 
     return plan.formulate_plan()
 
@@ -141,8 +144,17 @@ class ActionPlan(object):
 
     """Is an iterator that returns Actions """
 
-    def __init__(self, build_definition):
+    def __init__(self, build_definition, project=None):
+        """
+        Generally ActionPlans should be initialised using a
+        BuildDefinition, but for initialisation there is none,
+        so we just pass the project object directly.
+        """
         self.build_definition = build_definition
+        if project:
+            self.project = project
+        else:
+            self.project = self.build_definition.project
         self.current_index = -1
         self.plan = []
 
@@ -165,9 +177,42 @@ class ActionPlan(object):
             raise StopIteration
 
 
-class DockerActionPlan(ActionPlan):
+class InitActionPlan(ActionPlan):
 
-    """Is an iterator that returns BuildSteps"""
+    def formulate_plan(self):
+        return [
+                {
+                   'group': 'project',
+                   'action': 'clone_repo',
+                   'name': 'Clone project %s with git repo' % self.project.name,
+                   'index': 0,
+                   'project': self.project.name
+                },
+                {
+                   'group': 'project',
+                   'action': 'sync_repo',
+                   'name': 'Sync project %s with git repo' % self.project.name,
+                   'index': 1,
+                   'project': self.project.name
+                },
+                {
+                   'group': 'project',
+                   'action': 'import_build_definition',
+                   'name': 'Import build definition for project %s' % self.project.name,
+                   'index': 2,
+                   'project': self.project.name
+                },
+                {
+                   'group': 'project',
+                   'action': 'build',
+                   'name': 'Trigger build for project %s' % self.project.name,
+                   'index': 3,
+                   'project': self.project.name
+                },
+            ]
+
+
+class DockerActionPlan(ActionPlan):
 
     def formulate_plan(self):
         build_data = yaml.load(StringIO(self.build_definition.raw_plan))

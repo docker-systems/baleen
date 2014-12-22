@@ -20,7 +20,7 @@ class JobTest(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
@@ -189,7 +189,7 @@ class JobTemplateTagsTest(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RunCommandAction(project=self.project, index=0, name='TestAction',
+        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')

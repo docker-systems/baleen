@@ -18,7 +18,7 @@ class TestActionOutput(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.job = Job(project=self.project, github_data='{}')
@@ -57,13 +57,11 @@ class TestCoverageXMLOutput(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.job = Job(project=self.project, github_data='{}')
         self.job.save()
-
-        ea = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_XML)
 
         self.job.record_action_start(self.action)
         cover_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -87,7 +85,7 @@ class TestXUnitOutput(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.job = Job(project=self.project, github_data='{}')
@@ -128,7 +126,7 @@ class TestExpectedOutput(TestCase):
         self.project = Project(name='TestProject')
         self.project.save()
 
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.ea = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT,

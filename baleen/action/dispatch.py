@@ -61,7 +61,7 @@ def _load_action_map(ACTION_MODULES):
     like a fair bit of work to understand.
 
     >>> _load_action_map({'test': 'baleen.action.project'})['test'].keys()
-    ['create_project', 'sync_project', 'build_project']
+    ['sync_repo', 'git', 'clone_repo', 'create', 'import_build_definition', 'build']
     """
     action_map = {}
     for group, module in ACTION_MODULES.items():
@@ -78,6 +78,8 @@ def _load_action_map(ACTION_MODULES):
                     log.info("Found action %s:%s in module %s" % (group, l, module))
                     action_map.setdefault(group, {})
                     action_map[group][l] = obj
+            elif name == 'init_actions':
+                obj()
     return action_map
 
 

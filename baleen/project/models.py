@@ -115,7 +115,6 @@ class Project(models.Model):
         return statsd_label_converter(self.name)
 
     def github_push_url(self):
-        print self.github_token
         return reverse('github_url', kwargs={'github_token': self.github_token} )
 
     def current_job(self):
@@ -239,7 +238,7 @@ class BuildDefinition(models.Model):
 
     def save(self):
         if self.plan_type is None:
-            self.plan_type = self.detect_plan_type(self.filename, self.raw_plan)
+            self.plan_type = self.detect_plan_type()
         super(BuildDefinition, self).save()
 
     def detect_plan_type(self):

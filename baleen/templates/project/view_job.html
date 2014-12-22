@@ -57,7 +57,7 @@
             {% elif action_result.success %}<span class="success">&#x2714;</a>
             {% else %}<span class="failure">&#x2718;</a>
             {% endif %}
-            {{ action_result.action.index }}. {{ action_result.action.name }}<span style="display: none" class="updown"> +</span></h4>
+            {{ action_result.action }}<span style="display: none" class="updown"> +</span></h4>
         </div>
         <div {% if action_result.success %}style="display: none"{% endif %} class="span11 well details">
             <div class="tabbable tabs-left">

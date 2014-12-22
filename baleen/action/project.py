@@ -1,6 +1,7 @@
 import stat
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -49,46 +50,102 @@ class GitAction(Action):
         mkdir_p(settings.BUILD_ROOT)
         p = self.project
 
-        identity_fn = self.write_ssh_identity(p.private_key)
+        identity_fn = self.write_ssh_identity(p.private_key.value)
         git_ssh_fn = self.write_git_wrapper(identity_fn)
 
         os.environ['GIT_SSH'] = git_ssh_fn
         
         with cd(settings.BUILD_ROOT):
-            self.git_action(p)
+            response = self.git_action(p)
         del os.environ['GIT_SSH']
 
         # Clean up after outselves
         os.remove(identity_fn)
         os.remove(git_ssh_fn)
+        if response.get('code', -1) != 0:
+            response['success'] = False
+        return response
 
 
 class CloneRepoAction(GitAction):
 
     def git_action(self, p):
-        output = subprocess.Popen(
-            ["git", "clone", p.scm_url, p.project_dir],
-            stdout=subprocess.PIPE
-            ).stdout.read()
+        if os.path.exists(p.project_dir):
+            shutil.rmtree(p.project_dir)
 
-        result = output.decode('utf-8')
-        log.debug('Git clone stdout: %s' % result)
-        return result
+        git = subprocess.Popen(
+            ["git", "clone", p.scm_url, p.project_dir],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+            )
+
+        stdout, stderr = git.communicate()
+        status = git.returncode
+
+        stdout = stdout.decode('utf-8')
+        stderr = stderr.decode('utf-8')
+        log.debug('Git clone stdout: %s' % stdout)
+        log.debug('Git clone stderr: %s' % stderr)
+        return {
+            'stdout': stdout,
+            'stderr': stderr,
+            'code': status,
+        }
  
 
 class SyncRepoAction(GitAction):
 
     def git_action(self, p):
         with cd(p.project_dir):
-            output = subprocess.Popen(
+            git = subprocess.Popen(
                 ["git", "pull", "origin", "master"],
-                stdout=subprocess.PIPE
-                ).stdout.read()
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+                )
 
-        result = output.decode('utf-8')
-        log.debug('Git pull origin master stdout: %s' % result)
-        return result
+        stdout, stderr = git.communicate()
+        status = git.returncode
+
+        stdout = stdout.decode('utf-8')
+        stderr = stderr.decode('utf-8')
+        log.debug('Git pull origin master stdout: %s' % stdout)
+        log.debug('Git pull origin master stderr: %s' % stderr)
+        return {
+            'stdout': stdout,
+            'stderr': stderr,
+            'code': status,
+        }
+
+class ImportBuildDefinitionAction(Action):
+
+    def execute(self, stdoutlog, stderrlog, action_result):
+        from baleen.project.models import BuildDefinition
+
+        full_path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        with cd(full_path):
+            with open('baleen.yml') as fd:
+                raw_plan = fd.read()
+
+        bd = BuildDefinition(project=self.project,
+                commit='',
+                filename='baleen.yml',
+                raw_plan=raw_plan
+                )
+        bd.save()
+        return {
+            'stdout': 'imported baleen.yml',
+            'stderr': '',
+            'code': 0,
+        }
 
 
 class BuildAction(Action):
-    pass
+
+    def execute(self, stdoutlog, stderrlog, action_result):
+        # TODO actually trigger build!
+        return {
+            'stdout': 'do a build',
+            'stderr': '',
+            'code': 0,
+        }
+

@@ -78,9 +78,8 @@ class Job(models.Model):
 
         # Handle adding a summary message
         if not a.success:
-            a.message = 'Command "%s" on "%s@%s" failed with exit code: %d' % (
-                    action.command, action.username, action.host, a.status_code)
-        a.message += response.get('message', '')
+            a.message = action.failure_message(a)
+        a.message += (' ' + response.get('message', ''))
 
         if not a.success:
             # If a action belonging to this job fails, then the whole job is marked
@@ -116,6 +115,7 @@ class Job(models.Model):
         self.worker_pid = pid
         self.finished_at = None
         self.save()
+        self.stash = {}
 
     def record_done(self, success=True):
         self.success = success

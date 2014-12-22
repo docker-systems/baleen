@@ -119,22 +119,23 @@ class RunCommandAction(RemoteSSHAction):
         self.command = kwarg.get('command')
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        try:
-            with closing(self.get_ssh_connection()) as ssh:
-                transport = ssh.get_transport()
+        with closing(self.get_ssh_connection()) as ssh:
+            transport = ssh.get_transport()
 
-                response = self._run_command(self.command, transport,
-                        stdoutlog, stderrlog,
-                        action_result)
-        except AuthenticationException:
-            job.record_action_response(action, {
-                'success': False,
-                'message': "Authentication failure. Have you checked the host's .ssh/authorized_keys2 is up to date?",
-            })
-            stdoutlog.close()
-            stderrlog.close()
-            raise ActionFailed()
+            response = self._run_command(self.command, transport,
+                    stdoutlog, stderrlog,
+                    action_result)
+        #except AuthenticationException:
+            #job.record_action_response(action, {
+                #'success': False,
+                #'message': "Authentication failure. Have you checked the host's .ssh/authorized_keys2 is up to date?",
+            #})
+            #raise ActionFailed()
         return response
+
+    def failure_message(self, action_result):
+        return 'Command "%s" on "%s@%s" failed with exit code: %d' % (
+                self.command, self.username, self.host, action_result.status_code)
 
     def _run_command(self, command, transport, stdoutlog=None, stderrlog=None, action_result=None):
         response = {'stdout': '', 'stderr': '', 'code': None}

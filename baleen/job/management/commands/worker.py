@@ -13,7 +13,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from baleen.job.models import Job
-from baleen.project.models import Project
+from baleen.project.models import Project, ActionResult
 from baleen.action import ActionFailure
 from baleen.action.dispatch import get_action_object
 
@@ -152,13 +152,15 @@ class Command(BaseCommand):
                 response = a.run(job)
                 self.current_action = None
 
-                if response['code']:
+                if response['code'] != 0:
                     # If we got a non-zero exit status, then don't run any more actions
                     raise ActionFailure()
 
-                project_t.intermediate(action.statsd_name)
+                project_t.intermediate(a.statsd_name)
+                print "Action success."
             except ActionFailure:
                 self._reset_jobs()
+                print "Action failed."
                 return ''
 
         job.record_done()
@@ -168,6 +170,7 @@ class Command(BaseCommand):
         counters['all']['success'] += 1
         self._reset_jobs()
 
+        print "Job completed."
         # Return empty string since this is always invoked in background mode, so
         # no-one would see the response anyway
         return ''
@@ -211,11 +214,16 @@ class Command(BaseCommand):
         print "Exiting, please wait while we update job status"
         if self.current_baleen_job:
             if self.current_action:
-                self.current_baleen_job.record_action_response(self.current_action, {
-                    'success': False,
-                    'message': "Action was interrupted by kill/term signal.",
-                })
+                print "have action, record action response"
+                try:
+                    self.current_baleen_job.record_action_response(self.current_action, {
+                        'success': False,
+                        'message': "Action was interrupted by kill/term signal.",
+                    })
+                except ActionResult.DoesNotExist:
+                    self.current_baleen_job.record_done(success=False)
             else:
+                print "no action, just done"
                 self.current_baleen_job.record_done(success=False)
         if self.current_gearman_job:
             # We need to tell gearman to forget about this job

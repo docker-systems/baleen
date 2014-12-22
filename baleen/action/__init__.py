@@ -63,6 +63,7 @@ class Action(object):
         gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
         gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'event': event}), background=True)
 
+    
     @property
     def statsd_name(self):
         return statsd_label_converter(self.name)
@@ -84,6 +85,7 @@ class Action(object):
 
                 response = self.execute(stdoutlog, stderrlog, action_result)
             except Exception as e:
+                print "Got an exception %s" % (str(e),)
                 # Any exception that leaks from running the action has stuff recorded
                 # and is then raised to the caller
                 tb_str = traceback.format_exc(sys.exc_info()[2])
@@ -92,6 +94,7 @@ class Action(object):
                     'message': str(e),
                     'detail': tb_str 
                 })
+                print tb_str
                 raise ActionFailure(e)
 
         job.record_action_response(self, response)
@@ -112,6 +115,9 @@ class Action(object):
         record ActionResult creation and log files.
         """
         return NotImplemented
+    
+    def failure_message(self, action_result):
+        return 'Action "%s" failed.' % (self.name,)
 
     def set_output(self, output):
         self.outputs[output.output_type] = output
@@ -188,25 +194,25 @@ class InitActionPlan(ActionPlan):
                    'index': 0,
                    'project': self.project.name
                 },
-                {
-                   'group': 'project',
-                   'action': 'sync_repo',
-                   'name': 'Sync project %s with git repo' % self.project.name,
-                   'index': 1,
-                   'project': self.project.name
-                },
+                #{
+                   #'group': 'project',
+                   #'action': 'sync_repo',
+                   #'name': 'Sync project %s with git repo' % self.project.name,
+                   #'index': 1,
+                   #'project': self.project.name
+                #},
                 {
                    'group': 'project',
                    'action': 'import_build_definition',
                    'name': 'Import build definition for project %s' % self.project.name,
-                   'index': 2,
+                   'index': 1,
                    'project': self.project.name
                 },
                 {
                    'group': 'project',
                    'action': 'build',
                    'name': 'Trigger build for project %s' % self.project.name,
-                   'index': 3,
+                   'index': 2,
                    'project': self.project.name
                 },
             ]
@@ -240,10 +246,20 @@ class DockerActionPlan(ActionPlan):
             return plan
 
         containers_to_build_and_test = build_data['build']
+        plan = []
 
-        for c in containers_to_build_and_test:
-            #DockerAction()
-            pass
+        index=0
+        for image_name, context in containers_to_build_and_test.iteritems():
+            plan.append({
+               'group': 'docker',
+               'action': 'build_image',
+               'name': 'Build docker image %s' % image_name,
+               'index': index,
+               'image': image_name,
+               'context': context,
+               'project': self.project.name
+            })
+            index += 1
 
         # in the case of any missing projects, the plan returned is one to
         # create/fetch/build one of the dependencies first.
@@ -252,25 +268,25 @@ class DockerActionPlan(ActionPlan):
         # try and deal to the dependencies first, while creating a post-success
         # hook waiting for them all.
 
-        plan = [
-                {
-                   'group': 'docker',
-                   'action': 'build_image',
-                   'image': 'docker.example.com/blah',
-                   'project': 'blah'
-                },
+        plan.extend([
                 {
                    'group': 'docker',
                    'action': 'test_with_fig',
-                   'figfile': 'fig_test.yml',
-                   'project': 'blah'
+                   'name': 'Test with fig',
+                   'index': index,
+                   'fig_file': 'fig_test.yml',
+                   'project': self.project.name,
                 },
                 {
                    'group': 'docker',
                    'action': 'get_build_artifact',
-                   'project': 'blah'
+                   'project':  self.project.name,
+                   'name': 'Get build artifact',
+                   'index': index + 1,
+                   'path': '/tmp/xunit.xml',
+                   'artifact_type': 'xunit',
                 }
-                ]
+                ])
         return plan
 
     def dependencies_ok(self, dependencies):

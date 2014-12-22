@@ -16,7 +16,7 @@ class ProjectTest(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
@@ -42,7 +42,7 @@ class ProjectTestView(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')

@@ -66,13 +66,7 @@ class GitAction(Action):
             response['success'] = False
         return response
 
-
-class CloneRepoAction(GitAction):
-
-    def git_action(self, p):
-        if os.path.exists(p.project_dir):
-            shutil.rmtree(p.project_dir)
-
+    def clone_repo(self, p):
         git = subprocess.Popen(
             ["git", "clone", p.scm_url, p.project_dir],
             stdout=subprocess.PIPE,
@@ -91,11 +85,8 @@ class CloneRepoAction(GitAction):
             'stderr': stderr,
             'code': status,
         }
- 
 
-class SyncRepoAction(GitAction):
-
-    def git_action(self, p):
+    def pull_repo(self, p):
         with cd(p.project_dir):
             git = subprocess.Popen(
                 ["git", "pull", "origin", "master"],
@@ -115,6 +106,26 @@ class SyncRepoAction(GitAction):
             'stderr': stderr,
             'code': status,
         }
+
+
+class CloneRepoAction(GitAction):
+
+    def git_action(self, p):
+        if os.path.exists(p.project_dir):
+            shutil.rmtree(p.project_dir)
+
+        return self.clone_repo(p)
+ 
+
+class SyncRepoAction(GitAction):
+
+    def git_action(self, p):
+        if not os.path.exists(p.project_dir):
+            response = self.clone_repo(p)
+        else:
+            response = self.pull_repo(p)
+        return response
+
 
 class ImportBuildDefinitionAction(Action):
 

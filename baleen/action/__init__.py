@@ -246,9 +246,19 @@ class DockerActionPlan(ActionPlan):
             return plan
 
         containers_to_build_and_test = build_data['build']
-        plan = []
-
         index=0
+        plan = []
+        plan.append(
+            {
+               'group': 'project',
+               'action': 'sync_repo',
+               'name': 'Sync project %s with git repo' % self.project.name,
+               'index': index,
+               'project': self.project.name
+            }
+        )
+        index+=1
+
         for image_name, context in containers_to_build_and_test.iteritems():
             plan.append({
                'group': 'docker',

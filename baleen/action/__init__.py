@@ -68,7 +68,8 @@ class Action(object):
     def statsd_name(self):
         return statsd_label_converter(self.name)
 
-    def run(self, job=None):
+    def run(self, job):
+        self.job = job
         log.info("Job %s - doing action: %s - %s" % (unicode(job.id), self.project.name, self.name))
 
         out_f, err_f = job.get_live_job_filenames()

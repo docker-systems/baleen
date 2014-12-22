@@ -13,6 +13,10 @@ from baleen.utils import cd
 log = logging.getLogger('baleen.action.docker')
 
 def login_registry(registry, creds):
+    """
+    Make sure we have logged into a registry using the 
+    "docker login" command.
+    """
     docker = subprocess.Popen(
         ["docker", "login",
             "-u", creds['user'],
@@ -38,6 +42,14 @@ def login_registry(registry, creds):
 
 
 def init_actions():
+    """
+    init_actions is called when this module is first loaded
+    via baleen.action.dispatch.
+
+    We ensure docker host environment variable is setup,
+    and that we are signed into any registries that we have
+    credentials for.
+    """
     os.environ['DOCKER_HOST'] = settings.DOCKER_HOST
     for url, details in settings.DOCKER_REGISTRIES.items():
         login_registry(url, details)
@@ -99,6 +111,14 @@ class TestWithFigAction(Action):
         return "TestWithFigAction: %s" % self.name
 
     def execute(self, stdoutlog, stderrlog, action_result):
+        # Set the FIG_PROJECT_NAME environment variable to build id
+        # to avoid concurrent builds getting funky:
+        # https://github.com/docker/fig/issues/748
+        os.environ['FIG_PROJECT_NAME'] = self.project.name + '_' + str(self.job.id)
+        self.job.stash['FIG_PROJECT_NAME'] = os.environ['FIG_PROJECT_NAME']
+
+
+        del os.environ['FIG_PROJECT_NAME']
         return {
             'stdout': 'test with fig',
             'stderr': '',

@@ -63,18 +63,18 @@
             <div class="tabbable tabs-left">
                 <ul class="nav nav-tabs">
                     {% if not action_result.in_progress %}
-                    <li class="active"><a href="#action{{action_result.action.index}}-tab1" data-toggle="tab">Summary</a></li>
+                    <li class="active"><a href="#action{{action_result.action_slug}}-tab1" data-toggle="tab">Summary</a></li>
                     {% endif %}
                     {% if action_result.in_progress or action_result.stdout %}
-                    <li {% if action_result.in_progress %}class="active"{% endif %}><a href="#action{{action_result.action.index}}-tab2" data-toggle="tab">stdout</a></li>
+                    <li {% if action_result.in_progress %}class="active"{% endif %}><a href="#action{{action_result.action_slug}}-tab2" data-toggle="tab">stdout</a></li>
                     {% endif %}
                     {% if action_result.in_progress or action_result.stderr %}
-                    <li><a href="#action{{action_result.action.index}}-tab3" data-toggle="tab">stderr</a></li>
+                    <li><a href="#action{{action_result.action_slug}}-tab3" data-toggle="tab">stderr</a></li>
                     {% endif %}
                 </ul>
                 <div class="tab-content">
                     {% if not action_result.in_progress %}
-                    <div class="tab-pane active" id="action{{action_result.action.index}}-tab1">
+                    <div class="tab-pane active" id="action{{action_result.action_slug}}-tab1">
                         <p>As <code>{{ action_result.action.username }}</code>@<code>{{ action_result.action.host }}</code> run <code>{{ action_result.action.command }}</code></p>
                         <p> {% if not action_result.status_code %}<span class="">Exited with return code {{ action_result.status_code }}.<span>
                             {% else %}<span class="failure">Exited with<span>
@@ -90,12 +90,12 @@
                     </div>
                     {% endif %}
                     {% if action_result.stdout %}
-                        <div class="tab-pane {% if action_result.in_progress %}active{% endif %}" id="action{{action_result.action.index}}-tab2">
+                        <div class="tab-pane {% if action_result.in_progress %}active{% endif %}" id="action{{action_result.action_slug}}-tab2">
                             <pre class="stdout">{{ action_result.stdout.output }}</pre>
                         </div>
                     {% endif %}
                     {% if action_result.stderr %}
-                        <div class="tab-pane" id="action{{action_result.action.index}}-tab3">
+                        <div class="tab-pane" id="action{{action_result.action_slug}}-tab3">
                             <pre class="stderr">{{ action_result.stderr.output }}</pre>
                         </div>
                     {% endif %}

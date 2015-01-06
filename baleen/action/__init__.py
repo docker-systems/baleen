@@ -17,23 +17,6 @@ from baleen.project.models import Project, Hook
 log = logging.getLogger('baleen.action')
 
 
-def parse_build_definition(project, bd):
-    """
-    Work out what kind of build definition we're working with and return
-    the appropriate ActionPlan instance.
-    """
-    if bd is None:
-        plan = InitActionPlan(None, project=project)
-    else:
-        plan_type = bd.detect_plan_type()
-        if plan_type == 'docker':
-            plan = DockerActionPlan(bd)
-        else:
-            return NotImplemented
-
-    return plan.formulate_plan()
-
-
 class ActionFailure(Exception):
     pass
 
@@ -151,17 +134,18 @@ class ActionPlan(object):
 
     """Is an iterator that returns Actions """
 
-    def __init__(self, build_definition, project=None):
+    def __init__(self, job, project=None):
         """
-        Generally ActionPlans should be initialised using a
-        BuildDefinition, but for initialisation there is none,
-        so we just pass the project object directly.
+        Generally ActionPlans should be initialised using a Job's
+        build_definition. However, for git repo synchronisation there is none,
+        and in this case we just pass the project object directly.
         """
-        self.build_definition = build_definition
+        self.job = job
+        self.build_definition = job.build_definition
         if project:
             self.project = project
         else:
-            self.project = self.build_definition.project
+            self.project = self.job.project
         self.current_index = -1
         self.plan = []
 
@@ -184,46 +168,12 @@ class ActionPlan(object):
             raise StopIteration
 
 
-class InitActionPlan(ActionPlan):
-
-    def formulate_plan(self):
-        return [
-                {
-                   'group': 'project',
-                   'action': 'clone_repo',
-                   'name': 'Clone project %s with git repo' % self.project.name,
-                   'index': 0,
-                   'project': self.project.name
-                },
-                #{
-                   #'group': 'project',
-                   #'action': 'sync_repo',
-                   #'name': 'Sync project %s with git repo' % self.project.name,
-                   #'index': 1,
-                   #'project': self.project.name
-                #},
-                {
-                   'group': 'project',
-                   'action': 'import_build_definition',
-                   'name': 'Import build definition for project %s' % self.project.name,
-                   'index': 1,
-                   'project': self.project.name
-                },
-                {
-                   'group': 'project',
-                   'action': 'build',
-                   'name': 'Trigger build for project %s' % self.project.name,
-                   'index': 2,
-                   'project': self.project.name
-                },
-            ]
-
-
 class DockerActionPlan(ActionPlan):
 
     def formulate_plan(self):
-        build_data = yaml.load(StringIO(self.build_definition.raw_plan))
-        current_project = self.build_definition.project
+        build_data = yaml.load(StringIO(self.build_definition))
+        current_project = self.project
+        print build_data
 
         if build_data is None:
             return []
@@ -249,16 +199,17 @@ class DockerActionPlan(ActionPlan):
         containers_to_build_and_test = build_data['build']
         index=0
         plan = []
-        plan.append(
-            {
-               'group': 'project',
-               'action': 'sync_repo',
-               'name': 'Sync project %s with git repo' % self.project.name,
-               'index': index,
-               'project': self.project.name
-            }
-        )
-        index+=1
+        # Unnecessary since we always do a fresh clone now
+        #plan.append(
+            #{
+               #'group': 'project',
+               #'action': 'sync_repo',
+               #'name': 'Sync project %s with git repo' % self.project.name,
+               #'index': index,
+               #'project': self.project.name
+            #}
+        #)
+        #index+=1
 
         for image_name, context in containers_to_build_and_test.iteritems():
             plan.append({
@@ -278,26 +229,38 @@ class DockerActionPlan(ActionPlan):
         # whenever the dependencies are not satisfied, the plan will be to
         # try and deal to the dependencies first, while creating a post-success
         # hook waiting for them all.
+        print build_data
 
-        plan.extend([
-                {
+        plan.append({
                    'group': 'docker',
                    'action': 'test_with_fig',
                    'name': 'Test with fig',
                    'index': index,
-                   'fig_file': 'fig_test.yml',
+                   'fig_data': build_data.get('test'), #'fig_test.yml',
                    'project': self.project.name,
-                },
+                })
+        index += 1
+
+        for artifact_type, details in build_data.get('artifacts', {}).items():
+            plan.append({
+                       'group': 'docker',
+                       'action': 'get_build_artifact',
+                       'project':  self.project.name,
+                       'name': 'Get build artifact ' + artifact_type,
+                       'index': index + 1,
+                       'artifact_type': artifact_type,
+                       'path': details.get('path')
+                    })
+            index += 1
+
+        plan.append(
                 {
                    'group': 'docker',
-                   'action': 'get_build_artifact',
+                   'action': 'tag_good_image',
                    'project':  self.project.name,
-                   'name': 'Get build artifact',
-                   'index': index + 1,
-                   'path': '/tmp/xunit.xml',
-                   'artifact_type': 'xunit',
-                }
-                ])
+                   'name': 'Tag successfully tested image as "latest"',
+                   'index': index
+                })
         return plan
 
     def dependencies_ok(self, dependencies):
@@ -408,4 +371,3 @@ class ExpectedActionOutput(object):
         res = [x[1] for x in output_types.DETAILS if x[0] == self.output_type]
         if res:
             return res[0]
-

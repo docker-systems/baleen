@@ -130,19 +130,13 @@ class SyncRepoAction(GitAction):
 class ImportBuildDefinitionAction(Action):
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        from baleen.project.models import BuildDefinition
-
         full_path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
         with cd(full_path):
             with open('baleen.yml') as fd:
                 raw_plan = fd.read()
 
-        bd = BuildDefinition(project=self.project,
-                commit='',
-                filename='baleen.yml',
-                raw_plan=raw_plan
-                )
-        bd.save()
+        action_result.job.build_definition = raw_plan
+        action_result.job.save()
         return {
             'stdout': 'imported baleen.yml',
             'stderr': '',
@@ -159,4 +153,3 @@ class BuildAction(Action):
             'stderr': '',
             'code': 0,
         }
-

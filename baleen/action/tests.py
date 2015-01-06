@@ -12,12 +12,12 @@ from baleen.action.project import CreateAction
 
 from baleen.action import (
         ExpectedActionOutput,
-        parse_build_definition,
         ActionPlan,
         DockerActionPlan
         )
 
-from baleen.project.models import Project, BuildDefinition, Hook
+from baleen.project.models import Project, Hook
+from baleen.job.models import Job
 from baleen.artifact.models import output_types
 
 class ActionPlanTest(TestCase):
@@ -29,16 +29,15 @@ class ActionPlanTest(TestCase):
                 username='foo', command='echo "blah"')
 
         the_plan = ''
-        self.bd = BuildDefinition(project=self.project, plan_type='docker',
-                raw_plan=the_plan)
-        self.bd.save()
+        self.job = Job(project=self.project, build_definition=the_plan)
+        self.job.save()
 
-    def test_parse_build_definition(self):
-        action_steps = parse_build_definition(self.project, self.bd)
+    def test_job_action_plan(self):
+        action_steps = self.job.action_plan()
         self.assertEqual(action_steps, [], 'no action steps for blank plan')
 
     def test_iterate_steps(self):
-        ap = ActionPlan(self.bd)
+        ap = ActionPlan(self.job)
         ap.plan = [1, 2, 3]
         self.assertEqual([step for step in ap], [1, 2, 3])
 
@@ -52,9 +51,8 @@ class DockerActionPlanTest(TestCase):
                 username='foo', command='echo "blah"')
 
     def create_plan(self, the_plan):
-        self.bd = BuildDefinition(project=self.project, plan_type='docker',
-                raw_plan=the_plan)
-        self.bd.save()
+        self.job = Job(project=self.project, build_definition=the_plan)
+        self.job.save()
 
     def user_and_login(self):
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
@@ -63,7 +61,7 @@ class DockerActionPlanTest(TestCase):
 
     def test_formulate_blank_plan(self):
         self.create_plan('')
-        ap = DockerActionPlan(self.bd)
+        ap = DockerActionPlan(self.job)
         action_steps = ap.formulate_plan()
         self.assertEqual(action_steps, [], 'no action steps for blank plan')
 
@@ -79,7 +77,7 @@ build:
     docker.example.com/blah: .
 """
         )
-        ap = DockerActionPlan(self.bd)
+        ap = DockerActionPlan(self.job)
         action_steps = ap.formulate_plan()
         # Will formulate plan to build dependency first.
         print action_steps

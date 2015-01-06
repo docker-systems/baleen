@@ -1,16 +1,19 @@
 import subprocess
 import logging
 import os
+import yaml
+import tempfile
 
-from contextlib import closing
+from StringIO import StringIO
 from django.conf import settings
+from contextlib import closing
 
 from baleen.action import Action
-
-from baleen.utils import cd
+from baleen.utils import mkdir_p, cd
 
 
 log = logging.getLogger('baleen.action.docker')
+
 
 def login_registry(registry, creds):
     """
@@ -40,7 +43,6 @@ def login_registry(registry, creds):
     }
 
 
-
 def init_actions():
     """
     init_actions is called when this module is first loaded
@@ -66,10 +68,16 @@ class BuildImageAction(Action):
         return "BuildImageAction: %s" % self.name
 
     def execute(self, stdoutlog, stderrlog, action_result):
+        self.docker_tag = 'baleen_' + str(self.job.id)
+        self.job.stash['docker_image'] = self.image_name
+        self.job.stash['docker_tag'] = self.docker_tag
+
         path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
         with cd(path):
             docker = subprocess.Popen(
-                ["docker", "build", "-t", self.image_name + ":baleen", self.context],
+                ["docker", "build", "-t",
+                    self.image_name + ":" + self.docker_tag,
+                    self.context],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
                 )
@@ -105,24 +113,148 @@ class TestWithFigAction(Action):
 
     def __init__(self, project, name, index, *arg, **kwarg):
         super(TestWithFigAction, self).__init__(project, name, index)
-        self.fig_file = kwarg.get('fig_file')
+        self.fig_raw_data = kwarg.get('fig_data')
+        # fig_data looks like:
+        #{'subject':
+            #{
+                #'image':  "docker.domarino.com/api:baleen",
+                #'command': ['./run_tests.sh']
+            #}
+        #}
+        self.fig_data = yaml.load(StringIO(self.fig_raw_data))
+        self.volume_dir = None
+
+    def _inject_baleen_data(self, data):
+        from baleen.project.models import Credential
+
+        build_data = yaml.load(StringIO(self.job.build_definition))
+
+        for container in data.keys():
+            if 'image' in data[container]:
+                image = data[container]['image']
+            else:
+                image = self.job.stash['docker_image']
+            image_parts = image.rsplit(':')
+            if len(image_parts) > 1:
+                image = image_parts[0] 
+            data[container]['image'] = image + ':' + self.job.stash['docker_tag']
+
+            if 'credentials' in build_data:
+                data[container].setdefault('environment', {})
+                for c_name, value in build_data['credentials'].items():
+                    try:
+                        c = Credential.objects.get(project=self.project, name=c_name)
+                        val = c.value
+                    except Credential.DoesNotExist:
+                        log.warning('No credential found with name %s' % c_name)
+                        val = None
+                    if value == 'FILE':
+                        # TODO write credential to image using:
+                        # echo val | docker run -i DOCKER_IMAGE /bin/bash -c 'cat > tempfilename'
+                        # docker commit `docker ps -l -q` DOCKER_IMAGE:docker_tag+"credential"
+                        # val == 'tempfilename'
+                        pass
+                    data[container]['environment'][c_name] = val
+        return data
 
     def __unicode__(self):
         return "TestWithFigAction: %s" % self.name
 
+    def write_fig_file(self, fig_data):
+        fd, identity_fn = tempfile.mkstemp()
+        with closing(os.fdopen(fd, 'w')) as ft:
+            yaml.dump(fig_data, ft)
+        return identity_fn
+
     def execute(self, stdoutlog, stderrlog, action_result):
+        fig_data_with_images = self._inject_baleen_data(self.fig_data)
         # Set the FIG_PROJECT_NAME environment variable to build id
         # to avoid concurrent builds getting funky:
         # https://github.com/docker/fig/issues/748
-        os.environ['FIG_PROJECT_NAME'] = self.project.name + '_' + str(self.job.id)
-        self.job.stash['FIG_PROJECT_NAME'] = os.environ['FIG_PROJECT_NAME']
+        os.environ['FIG_PROJECT_NAME'] = self.project.name + str(self.job.id)
 
+        self.job.stash['fig_project_name'] = os.environ['FIG_PROJECT_NAME']
+        self.job.stash['fig_test_container'] = (
+                os.environ['FIG_PROJECT_NAME']
+                + '_' + 'subject' + '_1' 
+                )
+
+        fn = self.write_fig_file(fig_data_with_images)
+        fig = subprocess.Popen(
+            ["fig", "-f", fn, "up", "-d"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+            )
+
+        stdout, stderr = fig.communicate()
+        status = fig.returncode
+        
+        if status != 0:
+            return {
+                'stdout': stdout,
+                'stderr': stderr,
+                'code': status,
+            }
+
+        # TODO: make collecting the test container logs a separate action
+        stdout = stdout.decode('utf-8')
+        stderr = stderr.decode('utf-8')
+        log.debug('Fig test stdout: %s' % stdout)
+        log.debug('Fig test stderr: %s' % stderr)
+
+        # Get test container stdout/stderr
+        docker = subprocess.Popen(
+            ["docker", "logs", "-f", self.job.stash['fig_test_container'] ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+            )
+
+        stdout, stderr = docker.communicate()
+        status = docker.returncode
+
+        if status != 0:
+            return {
+                'stdout': stdout,
+                'stderr': stderr,
+                'code': status,
+            }
+
+
+        stdout = stdout.decode('utf-8')
+        stderr = stderr.decode('utf-8')
+        log.debug('Get test stdout: %s' % stdout)
+        log.debug('Get test stderr: %s' % stderr)
+
+        # Get test container exit code
+        docker2 = subprocess.Popen(
+            ["docker", "wait", self.job.stash['fig_test_container'] ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+            )
+
+        stdout2, stderr2 = docker2.communicate()
+        status = docker2.returncode
+
+        if status != 0:
+            return {
+                'stdout': stdout2,
+                'stderr': stderr2,
+                'code': status,
+            }
+
+        stdout2 = stdout2.decode('utf-8')
+        stderr2 = stderr2.decode('utf-8')
+        log.debug('Get test stdout: %s' % stdout2)
+        log.debug('Get test stderr: %s' % stderr2)
+
+        status = int(stdout2)
 
         del os.environ['FIG_PROJECT_NAME']
+
         return {
-            'stdout': 'test with fig',
-            'stderr': '',
-            'code': 0,
+            'stdout': stdout,
+            'stderr': stderr,
+            'code': status,
         }
 
 
@@ -132,20 +264,27 @@ class GetBuildArtifactAction(Action):
         super(GetBuildArtifactAction, self).__init__(project, name, index)
         self.artifact_path = kwarg.get('path')
         self.artifact_type = kwarg.get('artifact_type')
-        self.image_name = kwarg.get('image')
 
     def __unicode__(self):
         return "BuildImageAction: %s" % self.name
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        CONTAINER_NAME = 'monkey'
-        path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
-        with cd(path):
-            docker = subprocess.Popen(
-                ["docker", "cp", CONTAINER_NAME, self.artifact_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+        CONTAINER_NAME = self.job.stash['fig_test_container']
+        path = os.path.join(
+                settings.ARTIFACT_DIR,
+                self.project.project_dir,
+                str(self.job.id)
                 )
+        mkdir_p(path)
+
+        docker = subprocess.Popen(
+                ["docker", "cp",
+                    CONTAINER_NAME + ":" + self.artifact_path,
+                    path
+                ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+            )
 
         stdout, stderr = docker.communicate()
         status = docker.returncode
@@ -159,3 +298,37 @@ class GetBuildArtifactAction(Action):
             'stderr': stderr,
             'code': status,
         }
+
+
+class TagGoodImageAction(Action):
+
+    def __unicode__(self):
+        return "TagGoodImageAction: %s" % self.name
+
+    def execute(self, stdoutlog, stderrlog, action_result):
+        path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        with cd(path):
+            docker = subprocess.Popen(
+                ["docker", "tag",
+                    self.job.stash['docker_image'] + ":" +
+                    self.job.stash['docker_tag'],
+                    self.job.stash['docker_image'] + ":latest",
+                    ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+                )
+
+        stdout, stderr = docker.communicate()
+        status = docker.returncode
+
+        stdout = stdout.decode('utf-8')
+        stderr = stderr.decode('utf-8')
+        log.debug('BuildImage stdout: %s' % stdout)
+        log.debug('BuildImage stderr: %s' % stderr)
+        return {
+            'stdout': stdout,
+            'stderr': stderr,
+            'code': status,
+        }
+
+

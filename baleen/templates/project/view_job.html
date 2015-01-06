@@ -65,10 +65,10 @@
                     {% if not action_result.in_progress %}
                     <li class="active"><a href="#action{{action_result.action_slug}}-tab1" data-toggle="tab">Summary</a></li>
                     {% endif %}
-                    {% if action_result.in_progress or action_result.stdout %}
+                    {% if action_result.in_progress or action_result.stdout.output %}
                     <li {% if action_result.in_progress %}class="active"{% endif %}><a href="#action{{action_result.action_slug}}-tab2" data-toggle="tab">stdout</a></li>
                     {% endif %}
-                    {% if action_result.in_progress or action_result.stderr %}
+                    {% if action_result.in_progress or action_result.stderr.output %}
                     <li><a href="#action{{action_result.action_slug}}-tab3" data-toggle="tab">stderr</a></li>
                     {% endif %}
                 </ul>
@@ -89,12 +89,12 @@
                         {% endif %}
                     </div>
                     {% endif %}
-                    {% if action_result.stdout %}
+                    {% if action_result.stdout.output %}
                         <div class="tab-pane {% if action_result.in_progress %}active{% endif %}" id="action{{action_result.action_slug}}-tab2">
                             <pre class="stdout">{{ action_result.stdout.output }}</pre>
                         </div>
                     {% endif %}
-                    {% if action_result.stderr %}
+                    {% if action_result.stderr.output %}
                         <div class="tab-pane" id="action{{action_result.action_slug}}-tab3">
                             <pre class="stderr">{{ action_result.stderr.output }}</pre>
                         </div>

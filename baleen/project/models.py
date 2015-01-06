@@ -4,9 +4,7 @@ from django.core.urlresolvers import reverse
 from django.utils.text import slugify
 
 import logging
-import json
 import re
-import gearman
 
 from baleen.job.models import Job
 from baleen.artifact.models import output_types, ActionOutput
@@ -60,11 +58,16 @@ class Project(models.Model):
         return "Project %s" % self.name
 
     def action_plan(self):
-        from baleen.action import parse_build_definition
-
-        #bd = self.builddefinition_set.all().order_by('created_at').first()
-        bd = self.builddefinition_set.all().order_by('commit').first()
-        return parse_build_definition(self, bd)
+        """
+        This is just the action plan from the last job run. The action plan is
+        recalculated when the github repo is pulled and the build definition
+        file is parsed.
+        """
+        j = self.last_job()
+        if j:
+            return j.action_plan()
+        else:
+            return []
 
     def save(self):
         do_clone = False
@@ -84,16 +87,6 @@ class Project(models.Model):
         if do_clone:
             from baleen.job.models import manual_run
             manual_run(self)
-            #gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
-            #gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps(
-                #{
-                    #'group': 'project',
-                    #'action': 'clone_repo',
-                    #'name': 'Clone repo for project %s' % self.name,
-                    #'index': 0,
-                    #'project': self.id,
-                    #'generate_actions': True
-                #}), background=True)
 
     @property
     def project_dir(self):
@@ -180,6 +173,7 @@ class Credential(models.Model):
     
     name = models.CharField(max_length=255)
     value = models.TextField(max_length=255)
+
     environment = models.BooleanField(default=False)
 
     def __unicode__(self):
@@ -219,33 +213,6 @@ class Hook(models.Model):
         pass
 
 
-class BuildDefinition(models.Model):
-    """
-    A build definition is a file in the repo that is parsed to work out
-    how to build the project.
-
-    It is used to generate an ActionPlan.
-    """
-    project = models.ForeignKey('project.Project')
-    #created_at = models.DateTimeField(
-            #help_text='The source commit hash this build definition came from')
-    commit = models.CharField(max_length=255, null=True, blank=True,
-            help_text='The source commit hash this build definition came from')
-    filename = models.CharField(max_length=255, null=True, blank=True,
-            help_text='Filename will probably help determine what the format is') 
-    raw_plan = models.TextField(null=True, blank=True)
-    plan_type = models.CharField(max_length=255, null=True, blank=True) 
-
-    def save(self):
-        if self.plan_type is None:
-            self.plan_type = self.detect_plan_type()
-        super(BuildDefinition, self).save()
-
-    def detect_plan_type(self):
-        # assume it's docker until we support new types
-        return 'docker'
-
-
 class ActionResult(models.Model):
     """
     When an Action is run, an ActionResult is created.
@@ -261,6 +228,7 @@ class ActionResult(models.Model):
     action = models.CharField(max_length=255)
     action_slug = models.CharField(max_length=255, blank=True)
 
+    #index = models.IntegerField()
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True)
 
@@ -306,3 +274,6 @@ class ActionResult(models.Model):
             return self.actionoutput_set.get(output_type=output_type)
         except ActionOutput.DoesNotExist:
             pass
+
+    class Meta:
+        ordering = ['job', 'started_at']

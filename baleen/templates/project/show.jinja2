@@ -30,9 +30,7 @@
         {% include 'project/_list_jobs.html' %}
     </div>
     <div class="tab-pane" id="tab-actions">
-        <div id="deployment-actions"></div>
-        <a id="deployment-actions-add" class="btn">Add deployment action <i class="icon-plus"></i></a>
-        <div id="post-data"></div>
+        {% include 'project/_show_action_plan.jinja2' %}
     </div>
     <div class="tab-pane" id="tab-config">
         {% include 'project/_edit_project.jinja2' %}
@@ -40,120 +38,6 @@
 </div>
 {% endblock %}
 {% block script %}
-<script type="text/template" id="action-edit-tpl">
-<div class="row">
-    <div class="span12">
-        <div class="well">
-            <div class="row-fluid">
-                <div class="messages"></div>
-                <form id="action-form-<%- id %>" class="edit-form form-horizontal">
-                    <input type="hidden" name="id" value="<%- id %>"/>
-                    <fieldset><legend>Task</legend>
-                    <div class="control-group">
-                        <label class="control-label" for="name">Name</label>
-                        <div class="controls">
-                            <input type="text" class="span3" name="name" value="<%- name %>">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Destination</label>
-                        
-                        <div class="controls">
-                            <input type="text" class="span2" name="username" placeholder="user" value="<%- username %>"/>
-                            @
-                            <input type="text" class="span4" name="host" placeholder="host" value="<%- host %>"/>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Command</label>
-                        
-                        <div class="controls">
-                            <textarea rows=3 class="span6" name="command" placeholder="command"><%- command %></textarea>
-                        </div>
-                    </div>
-                    </fieldset>
-                    <fieldset><legend>Test Results</legend>
-                    <div class="control-group">
-                        <label class="control-label">Xunit path</label>
-
-                        <div class="controls">
-                            <input type="text" class="span6" name="output_UX" placeholder="path to xunit file" value="<%- output_UX %>">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Coverage.xml path</label>
-
-                        <div class="controls">
-                            <input type="text" class="span6" name="output_CX" placeholder="path to coverage xml file" value="<%- output_CX %>">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Coverage html directory</label>
-
-                        <div class="controls">
-                            <input type="text" class="span6" name="output_CH" placeholder="path to coverage html dir" value="<%- output_CH %>">
-                        </div>
-                    </div>
-                    </fieldset>
-                    <fieldset><legend>Hooks</legend>
-                    <div class="control-group">
-                        <label class="control-label">Success hook</label>
-
-                        <div class="controls">
-                            <input type="text" class="span6" name="hook_success" placeholder="command to run on host on success" value="<%- hook_success %>">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Failure hook</label>
-
-                        <div class="controls">
-                            <input type="text" class="span6" name="hook_failure" placeholder="command to run on host on failure" value="<%- hook_failure %>">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Finished hook</label>
-
-                        <div class="controls">
-                            <input type="text" class="span6" name="hook_finished" placeholder="a second command to run on host after command" value="<%- hook_finished %>">
-                        </div>
-                    </div>
-                    </fieldset>
-                    <div class="control-group">
-
-                        <div class="controls">
-                            <a class="btn btn-primary save">Save</a>
-                            <a class="btn cancel">Cancel</a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-</script>
-<script type="text/template" id="action-view-tpl">
-<div class="row">
-    <div class="span12">
-        <div class="well">
-            <div class="row-fluid">
-                <div class="span12">
-                <div class="btn-group pull-right">
-                    <div class="btn-group">
-                        <a class="btn edit" data-id="<%- id %>">Edit <i class="icon-cog"></i></a>
-                        <a class="btn btn-danger dropdown-toggle" data-toggle="dropdown" href="#">Delete <i class="icon-white icon-remove"></i></a>
-                        <ul class="dropdown-menu action-remove pull-right">
-                            <li><a class="delete" href="">Confirm delete action</a></li>
-                        </ul>
-                    </div>
-                </div>
-                <h4><span class="handle" title="Click and drag to reorder actions" style="cursor: pointer"><%- name %></span></h4>
-                <p>As <code><%- username %></code> on <code><%- host %></code> run: <pre><%- command %></pre></p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-</script>
 
 <script type="text/template" id="error-tpl">
 <div class="alert alert-error">

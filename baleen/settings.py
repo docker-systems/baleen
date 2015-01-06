@@ -173,17 +173,14 @@ INSTALLED_APPS = (
 TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
 NOSE_ARGS = [
     '--with-xunit', '--with-doctest', #strange error not finding this
-
+    '-I', 'local_settings.*'
     ]
 NOSE_PLUGINS = [
     'baleen.nose_plugins.SilenceSouth',
 ]
 
 SENDFILE_BACKEND = 'sendfile.backends.xsendfile'
-HTMLCOV_DIR = os.path.join(PROJECT_DIR, 'htmlcov_projects')
-
-# Some convolution is required to get the htmlcov from the worker to the webapp
-HTMLCOV_LXC_STAGING_DIR = '/var/lib/lxc/baleen/rootfs/var/local/baleen/htmlcov_projects'
+ARTIFACT_DIR = os.path.join(PROJECT_DIR, 'build_artifacts')
 
 BUILD_ROOT = '/var/lib/baleen/'
 
@@ -193,6 +190,12 @@ GEARMAN_SERVER = 'localhost'
 GEARMAN_JOB_LABEL = 'baleen_job'
 
 GITHUB_HOOK_URL = SITE_URL + '/hub'
+
+ACTION_MODULES = {
+    'project': "baleen.action.project",
+    'docker': "baleen.action.docker",
+    'ssh': "baleen.action.ssh",
+}
 
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to

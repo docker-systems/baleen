@@ -11,9 +11,8 @@ from sendfile import sendfile
 
 import json
 
-from baleen.project.models import Project
+from baleen.project.models import ActionResult
 from baleen.job.models import Job
-from baleen.action.models import ActionResult
 from baleen.artifact.models import CoverageHTMLOutput
 
 
@@ -36,11 +35,11 @@ def mark_job_done(request, project_id, job_id):
     return redirect(reverse('show_project', kwargs=dict(project_id=project_id)))
 
 @login_required()
-def view_specific_action_html_coverage(request, project_id, job_id, action_id, filename):
+def view_specific_action_html_coverage(request, project_id, job_id, action, filename):
     """
     Serve htmlcov directory for a specific action.
     """
-    action_result = get_object_or_404(ActionResult, action_id=action_id, job_id=job_id)
+    action_result = get_object_or_404(ActionResult, action_slug=action, job_id=job_id)
     cov_output = CoverageHTMLOutput.objects.filter(action_result=action_result).first()
 
     if cov_output is None:
@@ -68,6 +67,6 @@ def view_html_coverage(request, project_id, job_id, filename):
         return redirect(reverse('view_specific_action_html_coverage', kwargs=dict(
             project_id=project_id,
             job_id=job_id,
-            action_id=cov_output.action_result.action.id,
+            action=cov_output.action_result.action_slug,
             filename=filename,)
             ))

@@ -9,29 +9,40 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils.timezone import now
 
-from baleen.action.models import ActionResult
-from baleen.artifact.models import ActionOutput, output_types, ExpectedActionOutput
-
-from baleen.utils import ManagerWithFirstQuery
+from baleen.artifact.models import ActionOutput, output_types
 
 from jsonfield import JSONField
 
 
-def manual_run(project, user):
+def manual_run(project, user=None):
     """ Manually instantiate a job for project """
     last_j = project.last_job()
     if last_j and last_j.github_data:
         blank_job = Job(project=last_j.project, github_data=last_j.github_data)
-    else:
+    elif user:
         blank_job = Job(project=project, manual_by=user)
+    else:
+        blank_job = Job(project=project, manual_by=project.creator)
     blank_job.save()
     blank_job.submit()
     return blank_job
 
 
 class Job(models.Model):
+    """
+    A job is a CI build based on a build definition within the project's repo.
+    """
     project = models.ForeignKey('project.Project')
-    github_data = JSONField()
+
+    github_data = JSONField(blank=True, null=True)
+    commit = models.CharField(max_length=255, null=True, blank=True)
+
+    build_definition = models.TextField(null=True, blank=True)
+    build_definition_type = models.CharField(max_length=64, null=True, blank=True) 
+
+    # TODO
+    #stash = JSONField(blank=True, null=True,
+            #help_text="Stash can have values written and read from during a build")
 
     received_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -43,8 +54,6 @@ class Job(models.Model):
     rejected = models.BooleanField(default=False)
     worker_pid = models.IntegerField(null=True, blank=True)
 
-    objects = ManagerWithFirstQuery()
-
     def __unicode__(self):
         return "Job for '%s' at %s" % (self.project.name, unicode(self.received_at))
 
@@ -53,13 +62,59 @@ class Job(models.Model):
         gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
         gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'job': self.id}), background=True)
 
+    def save(self):
+        if self.build_definition_type is None:
+            self.build_definition_type = self.detect_plan_type()
+        super(Job, self).save()
+
+    def detect_plan_type(self):
+        # assume it's docker until we support new types
+        return 'docker'
+
+    def checkout_repo_plan(self):
+        return [
+                {
+                   'group': 'project',
+                   'action': 'clone_repo',
+                   'name': 'Clone project %s with git repo' % self.project.name,
+                   'index': 0,
+                   'project': self.project.name
+                },
+                {
+                   'group': 'project',
+                   'action': 'import_build_definition',
+                   'name': 'Import build definition for project %s' % self.project.name,
+                   'index': 1,
+                   'project': self.project.name
+                },
+            ]
+        
+
+    def action_plan(self):
+        """
+        Work out what kind of build definition we're working with and return
+        the appropriate ActionPlan instance.
+        """
+        from baleen.action import DockerActionPlan
+        if not self.build_definition:
+            return []
+
+        if self.build_definition_type == 'docker':
+            plan = DockerActionPlan(self)
+        else:
+            return NotImplemented
+
+        return plan.formulate_plan()
+
     def record_action_start(self, action):
-        a = ActionResult(action=action, job=self, started_at=now())
+        from baleen.project.models import ActionResult
+        a = ActionResult(action=action.name, job=self, started_at=now())
         a.save()
         return a
 
     def record_action_response(self, action, response):
-        a = ActionResult.objects.get(action=action, job=self)
+        from baleen.project.models import ActionResult
+        a = ActionResult.objects.get(action=action.name, job=self)
 
         a.status_code = response.get('code')
         if a.status_code is None:
@@ -77,9 +132,8 @@ class Job(models.Model):
 
         # Handle adding a summary message
         if not a.success:
-            a.message = 'Command "%s" on "%s@%s" failed with exit code: %d' % (
-                    action.command, action.username, action.host, a.status_code)
-        a.message += response.get('message', '')
+            a.message = action.failure_message(a)
+        a.message += (' ' + response.get('message', ''))
 
         if not a.success:
             # If a action belonging to this job fails, then the whole job is marked
@@ -95,7 +149,6 @@ class Job(models.Model):
 
         for output_type, the_output in response.get('output', {}).items():
             # Check we are expecting output for this action
-            ExpectedActionOutput.objects.get(action=a.action, output_type=output_type)
             ao = ActionOutput(output=the_output, action_result=a, output_type=output_type)
             ao.save()
 
@@ -116,14 +169,17 @@ class Job(models.Model):
         self.worker_pid = pid
         self.finished_at = None
         self.save()
+        self.stash = {}
 
     def record_done(self, success=True):
         self.success = success
         self.finished_at = now()
         self.worker_pid = None
         self.save()
-        if not success:
-            commits = self.github_data.get('commits')
+        if not success and settings.MAILGUN_KEY:
+            commits = None
+            if self.github_data:
+                commits = self.github_data.get('commits')
             if commits is None:
                 return
             emails = [c['author']['email'] for c in commits]  # could use committer instead of author

@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 
 from baleen.project.models import Project
-from baleen.action.models import RemoteSSHAction
+from baleen.action.ssh import RemoteSSHAction
 
 from mock import patch
 
@@ -15,11 +15,9 @@ class ProjectTest(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
         self.user.save()
@@ -43,11 +41,9 @@ class ProjectTestView(TestCase):
 
     def setUp(self):
         self.project = Project(name='TestProject')
-        self.project.generate_github_token()
         self.project.save()
-        self.action = RemoteSSHAction(project=self.project, index=0, name='TestAction',
+        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
-        self.action.save()
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
         self.user.save()

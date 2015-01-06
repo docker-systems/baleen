@@ -10,8 +10,12 @@ RUN echo "deb-src http://http.debian.net/debian jessie main\n" \
     >> /etc/apt/sources.list
 RUN apt-get update && apt-get -y upgrade && echo 1
 RUN apt-get install -y libexpat1-dev libidn11-dev python-pip git \
-        libyaml-dev gearman gearman-job-server
+        libyaml-dev gearman gearman-job-server docker.io
 RUN apt-get build-dep -y psycopg2
+
+# Need to freakin' have some hosts, because we run git without
+# a tty stdin, so can't accept the unknown host prompt
+RUN mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 # create working dir
 RUN mkdir -p /usr/local/baleen

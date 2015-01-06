@@ -7,13 +7,13 @@ import functools
 
 from optparse import make_option
 from signal import signal, SIGTERM, SIGINT
-from paramiko import AuthenticationException
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from baleen.job.models import Job
-from baleen.project.models import Project
+from baleen.project.models import ActionResult
+from baleen.action.dispatch import get_action_object
 
 import statsd
 from statsd.counter import Counter
@@ -21,12 +21,25 @@ from statsd import Timer
 
 statsd.Connection.set_defaults(host='localhost', port=8125, sample_rate=1, disabled=True)
 
-gearman_worker = gearman.GearmanWorker([settings.GEARMAN_SERVER])
+class BaleenGearmanWorker(gearman.GearmanWorker):
+    def on_job_execute(self, current_job):
+        print "Job started"
+        return super(BaleenGearmanWorker, self).on_job_execute(current_job)
 
+    def on_job_exception(self, current_job, exc_info):
+        result = str(exc_info)
+        return super(BaleenGearmanWorker, self).send_job_complete(
+                current_job, result)
 
-class ActionFailed(Exception):
-    pass
+    def on_job_complete(self, current_job, job_result):
+        return super(BaleenGearmanWorker, self).send_job_complete(
+                current_job, job_result)
 
+    def after_poll(self, any_activity):
+        # Return True if you want to continue polling, replaces callback_fxn
+        return True
+
+gearman_worker = BaleenGearmanWorker([settings.GEARMAN_SERVER])
 
 class Command(BaseCommand):
     help = """
@@ -40,59 +53,17 @@ class Command(BaseCommand):
             ),
             make_option('-c', '--clear',
                 default=False,
-                action='store',
+                action='store_true',
                 dest='clear_jobs',
                 help="Clear all jobs in queue, don't run them."
             ),
+            make_option('-r', '--raw-plan',
+                default=None,
+                action='store',
+                dest='raw_plan',
+                help="Take a json file as the action plan, run it and exit"
+            ),
         )
-
-    def do_action(self, project, job, action):
-        print "Doing action: %s - %s" % (action.name, action.command)
-
-        out_f, err_f = job.get_live_job_filenames()
-        stdoutlog = open(out_f, 'w')
-        stderrlog = open(err_f, 'w')
-
-        stdoutlog.write("%s %s\n%s\n" % (project.name, action.name, action.command))
-        stdoutlog.flush()
-
-        try:
-            # Record that an action is about to be run before executing it.
-            # This makes it easier to show actions in progress on the job details/status
-            # screens.
-            action_result = job.record_action_start(action)
-            self.current_action = action
-
-            response = action.execute(stdoutlog, stderrlog, action_result)
-            # TODO: catch sftp errors
-        except AuthenticationException:
-            job.record_action_response(action, {
-                'success': False,
-                'message': "Authentication failure. Have you checked the host's .ssh/authorized_keys2 is up to date?",
-            })
-            stdoutlog.close()
-            stderrlog.close()
-            raise ActionFailed()
-        except Exception as e:
-            tb_str = traceback.format_exc(sys.exc_info()[2])
-            job.record_action_response(action, {
-                'success': False,
-                'message': str(e),
-                'detail': tb_str 
-            })
-            stdoutlog.close()
-            stderrlog.close()
-            raise ActionFailed()
-
-        stdoutlog.close()
-        stderrlog.close()
-
-        job.record_action_response(action, response)
-        self.current_action = None
-
-        if response['code']:
-            # If we got a non-zero exit status, then don't run any more actions
-            raise ActionFailed()
 
     def _reset_jobs(self):
         self.current_gearman_job = None
@@ -125,34 +96,36 @@ class Command(BaseCommand):
             if task_data.get('job'):
                 job_id = task_data.get('job')
                 return self.run_job(job_id)
-            elif task_data.get('project'):
-                project_id = task_data.get('project')
-                return self.sync_project(project_id)
             else:
                 return "Unknown task type"
+            print 'Task complete!'
         except Exception, e:
-            print "Unexpected error:", sys.exc_info()[0]
-            print str(e)
+            msg = "Unexpected error:" + sys.exc_info()[0]
+            msg += str(e)
+            print msg
             traceback.print_tb(sys.exc_info()[2])
-            # Usually raising an exception sends a job failure to gearman
-            # and this will presumedly restart the job on another worker.
 
-            # If that happens, then things are probably pretty bad, so it's
-            # better if we just forget about it.
-            self.clean_up()
+            self.clear_current_action(msg)
+            self._reset_jobs()
         return ''
 
+    def _do_action(self, job, action, project_timer):
+        # record this process id so that we can kill it via the web interface
+        # supervisord will automatically create a replacement process.
 
-    def sync_project(self, project_id):
-        project = Project.objects.get(id=project_id)
+        print action
+        a = get_action_object(action)
+        self.current_action = a
+        response = a.run(job)
+        self.current_action = None
 
-        try:
-            project.sync_repo()
-        except AssertionError:
-            print "failed to sync repo"
-            raise
-        return ''
-        
+        if response['code'] != 0:
+            # If we got a non-zero exit status, then don't run any more actions
+            raise Exception('Non-zero exit code')
+
+        project_timer.intermediate(a.statsd_name)
+        print "Action success."
+
 
     def run_job(self, job_id):
         worker_pid = os.getpid()
@@ -160,7 +133,6 @@ class Command(BaseCommand):
 
         self.current_baleen_job = job
 
-        actions = job.project.ordered_actions
         print "Running job %s" % job_id
 
         # Only one job per project!  Until we have per-project queues,
@@ -184,15 +156,15 @@ class Command(BaseCommand):
         all_t.start()
         job.record_start(worker_pid)
 
+        sync_actions = job.checkout_repo_plan()
+        for action in sync_actions:
+            self._do_action(job, action, project_t)
+
+        print "Finished sync with git"
+
+        actions = job.project.action_plan()
         for action in actions:
-            try:
-                # record this process id so that we can kill it via the web interface
-                # supervisord will automatically create a replacement process.
-                self.do_action(job.project, job, action)
-                project_t.intermediate(action.statsd_name)
-            except ActionFailed:
-                self._reset_jobs()
-                return ''
+            self._do_action(job, action, project_t)
 
         job.record_done()
         all_t.stop()
@@ -201,9 +173,15 @@ class Command(BaseCommand):
         counters['all']['success'] += 1
         self._reset_jobs()
 
+        print "Job completed."
         # Return empty string since this is always invoked in background mode, so
         # no-one would see the response anyway
         return ''
+
+    def process_plan(self, plan):
+        for step in plan:
+            action = get_action_object(step)
+            action.run()
 
 
     def handle(self, *args, **options):
@@ -213,10 +191,15 @@ class Command(BaseCommand):
 
         self.worker_process_number = options['worker_number']
 
-        if options['clear_jobs']:
+        if options['raw_plan']:
+            with open(options['raw_plan']) as f:
+                plan_data = json.load(f)
+            self.process_plan(plan_data)
+        elif options['clear_jobs']:
             print "Removing all jobs in queue..."
             gearman_worker.register_task(settings.GEARMAN_JOB_LABEL, functools.partial(self.clear_job))
         else:
+            # Default is to wait for jobs
             gearman_worker.register_task(settings.GEARMAN_JOB_LABEL, functools.partial(self.run_task))
 
         signal(SIGTERM, self.clean_up)
@@ -225,22 +208,32 @@ class Command(BaseCommand):
         print "baleen worker reporting for duty, sir/m'am!"
         gearman_worker.work()
 
-
     def clear_job(self, worker, gm_job):
         job_id = json.loads(gm_job.data).get('job_id', None)
         result = "Clearing job for job_id %d" % str(job_id)
         return result
 
+    def clear_current_action(self, msg=None):
+        if self.current_action:
+            print "have action, record action response"
+            if msg is None:
+                msg = "Action was interrupted by kill/term signal."
+
+            try:
+                self.current_baleen_job.record_action_response(self.current_action, {
+                    'success': False,
+                    'message': msg,
+                })
+            except ActionResult.DoesNotExist:
+                self.current_baleen_job.record_done(success=False)
+        else:
+            print "no action, just done"
+            self.current_baleen_job.record_done(success=False)
+
     def clean_up(self, *args):
         print "Exiting, please wait while we update job status"
         if self.current_baleen_job:
-            if self.current_action:
-                self.current_baleen_job.record_action_response(self.current_action, {
-                    'success': False,
-                    'message': "Action was interrupted by kill/term signal.",
-                })
-            else:
-                self.current_baleen_job.record_done(success=False)
+            self.clear_current_action()
         if self.current_gearman_job:
             # We need to tell gearman to forget about this job
             gearman_worker.send_job_complete(self.current_gearman_job, data='')

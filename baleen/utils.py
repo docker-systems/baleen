@@ -4,6 +4,8 @@ import tarfile
 import errno
 import paramiko
 
+from hashlib import sha256
+from base64 import urlsafe_b64encode
 from contextlib import contextmanager
 from StringIO import StringIO
 
@@ -64,3 +66,39 @@ def generate_ssh_key(length=2048):
     private_key = buf.getvalue()
     public_key = 'ssh-rsa %s' % key.get_base64()
     return private_key, public_key
+
+
+def generate_github_token():
+    seed = os.urandom(32)
+    token = sha256(sha256(seed).digest()).digest()
+    github_token = urlsafe_b64encode(token)[:-2]
+    return github_token
+
+
+def get_credential_key_pair(name, project=None, user=None):
+    from baleen.project.models import Credential
+
+    args = {}
+    if project:
+        args['project'] = project
+    elif user:
+        args['user'] = user
+    else:
+        raise Exception('Project or User needs to be specified when creating key pair')
+
+    pub_args = dict(args)
+    pub_args['name'] = name + '_public'
+    priv_args = dict(args)
+    priv_args['name'] = name + '_private'
+    try:
+        public = Credential.objects.get(**pub_args)
+        priv = Credential.objects.get(**priv_args)
+    except Credential.DoesNotExist:
+        priv_args['value'], pub_args['value'] = generate_ssh_key()
+
+        priv = Credential(**priv_args)
+        priv.save()
+
+        public = Credential(**pub_args)
+        public.save()
+    return priv, public

@@ -32,6 +32,8 @@ depends:
       # image: "docker.example.com/rabbitmq"
       #tag: v0.1.1
    db:
+      # if we use fig format to describe running the container,
+      # we don't need to explicitly put images here...
       # use official image from dockerhub
       image: "postgres"
    couchdb:

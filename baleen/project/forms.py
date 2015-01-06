@@ -16,5 +16,4 @@ class ProjectForm(forms.ModelForm):
 
     class Meta:
         model = Project
-        #fields = ['pub_date', 'headline', 'content', 'reporter']
-        exclude = ['github_token', 'private_key']
+        fields = ['name', 'site_url', 'scm_url', 'branch']

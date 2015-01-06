@@ -1,12 +1,22 @@
 from django.contrib import admin
 
-from baleen.project.models import Project
-from baleen.action.models import Action
+from baleen.project.models import Project, ActionResult, Credential
+from baleen.artifact.models import ActionOutput
 
-class ActionInline(admin.TabularInline):
-    model = Action
+
+class CredentialAdmin(admin.ModelAdmin):
+    model = Credential
+admin.site.register(Credential, CredentialAdmin)
 
 class ProjectAdmin(admin.ModelAdmin):
-    inlines = [ActionInline]
+    model = Project
 admin.site.register(Project, ProjectAdmin)
 
+
+class ActionOutputInline(admin.TabularInline):
+    model = ActionOutput
+
+
+class ActionResultAdmin(admin.ModelAdmin):
+    inlines = [ActionOutputInline]
+admin.site.register(ActionResult, ActionResultAdmin)

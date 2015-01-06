@@ -36,7 +36,7 @@ class TestActionOutput(TestCase):
                 output_type=output_types.STDOUT)
 
     def test_unicode(self):
-        self.assertEqual(unicode(self.action_output), u"Output stdout for Action 'RemoteSSHAction: TestAction'")
+        self.assertEqual(unicode(self.action_output), u"Output stdout for Action 'TestAction'")
 
     def test_in_progress(self):
         self.assertEqual(self.result.in_progress, False)

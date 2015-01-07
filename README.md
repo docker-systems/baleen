@@ -15,16 +15,12 @@ something that solves our use case.
 ## Install
 
 ```
-docker build -t baleen:latest .
-docker pull -t baleen:latest .
-
 fig build
 fig up -d db
 fig run web python manage.py syncdb
 fig run web python manage.py migrate --all
 fig up
 ```
-
 
 
 ## Delete and use fresh db

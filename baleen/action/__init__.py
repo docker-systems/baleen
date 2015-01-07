@@ -274,7 +274,7 @@ class DockerActionPlan(ActionPlan):
         Check if all project dependencies have a valid build.
         """
         try:
-            p = Project.objects.get(scm_url=repo)
+            p = Project.objects.get(repo_url=repo)
         except Project.DoesNotExist:
             return False
         j = p.last_successful_job()

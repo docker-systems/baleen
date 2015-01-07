@@ -26,11 +26,11 @@ class Project(models.Model):
             verbose_name="Site URL",
             help_text='A URL to where this project deploys to')
 
-    scm_url = models.CharField(max_length=255, null=True, blank=True,
-            verbose_name="SCM Repostory URL",
+    repo_url = models.CharField(max_length=255, null=True, blank=True,
+            verbose_name="Repository URL",
             help_text='URL to git repo')
-    #scm_sync_success = models.BooleanField(default=False, editable=False,
-            #help_text='Was the last attempt to sync with the SCM successful?')
+    #repo_sync_success = models.BooleanField(default=False, editable=False,
+            #help_text='Was the last attempt to sync with the repo successful?')
     creator = models.ForeignKey('auth.User', null=True)
 
     github_token = models.CharField(max_length=255, editable=False,
@@ -52,7 +52,7 @@ class Project(models.Model):
 
     def __init__(self, *args, **kwargs):
         super(Project, self).__init__(*args, **kwargs)
-        self._original_scm_url = self.scm_url
+        self._original_repo_url = self.repo_url
 
     def __unicode__(self):
         return "Project %s" % self.name
@@ -77,8 +77,8 @@ class Project(models.Model):
             cred_name = 'deploykey_' + self.name
             self.private_key, self.public_key = get_credential_key_pair(cred_name, self)
 
-        if self._original_scm_url != self.scm_url:
-            # The revision control url changed, we need to fire a task to
+        if self._original_repo_url != self.repo_url:
+            # The repo url changed, we need to fire a task to
             # checkout the code and configure based on the baleen.yml
             # (unless manual_config=True)
             do_clone = True

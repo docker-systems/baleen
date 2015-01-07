@@ -16,4 +16,4 @@ class ProjectForm(forms.ModelForm):
 
     class Meta:
         model = Project
-        fields = ['name', 'site_url', 'scm_url', 'branch']
+        fields = ['name', 'site_url', 'repo_url', 'branch']

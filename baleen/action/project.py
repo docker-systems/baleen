@@ -68,7 +68,7 @@ class GitAction(Action):
 
     def clone_repo(self, p):
         git = subprocess.Popen(
-            ["git", "clone", p.scm_url, p.project_dir],
+            ["git", "clone", p.repo_url, p.project_dir],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )

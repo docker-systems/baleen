@@ -16,9 +16,6 @@ paramiko
 supervisor
 python-statsd
 
-# For migration from old deployhub
-pymongo
-
 django-nose
 mock
 coverage
@@ -27,3 +24,4 @@ pip>=1.4
 wheel
 watchdog
 fig
+uwsgi

@@ -1,7 +1,15 @@
 #!/bin/sh
-echo "Starting supervisord..."
-supervisord -c supervisord.conf
-echo "Starting Baleen..."
+echo "Running syncdb and any pending migrations..."
+./manage.py syncdb --noinput --migrate
 
-#python manage.py runserver 0.0.0.0:8000 &
-/bin/bash
+: ${SHELL:='0'}
+
+echo "Starting supervisord..."
+echo "Starting Baleen..."
+if [ "$SHELL" = '1' ]; then
+    supervisord -c supervisord.conf
+    /bin/bash
+else
+    supervisord --nodaemon -c supervisord.conf
+fi
+

@@ -270,7 +270,10 @@ class JobTemplateTagsTest(TestCase):
                 }
         self.result = self.job.record_action_response(self.action, response)
         self.result.save()
-        ctxt = render_coverage(self.job.test_action_result())
+        ctxt = render_coverage(
+                self.job.get_action_result_with_output(output_types.COVERAGE_XML),
+                self.job.get_action_result_with_output(output_types.COVERAGE_HTML)
+                )
         self.assertEqual(97.0, ctxt['coverage_percent'])
 
     def test_render_coverage_with_html(self):
@@ -288,5 +291,8 @@ class JobTemplateTagsTest(TestCase):
                 }
         self.result = self.job.record_action_response(self.action, response)
         self.result.save()
-        ctxt = render_coverage(self.job.test_action_result())
+        ctxt = render_coverage(
+                self.job.get_action_result_with_output(output_types.COVERAGE_XML),
+                self.job.get_action_result_with_output(output_types.COVERAGE_HTML)
+                )
         self.assertTrue('index.html' in ctxt['coverage_html_url'])

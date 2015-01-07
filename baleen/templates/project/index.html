@@ -48,7 +48,7 @@
                 {% render_xunit_summary job.test_action_result %}
             </td>
             <td>
-                {% render_coverage job.test_action_result %}
+                {% render_coverage job.coverage_action_result.0 job.coverage_action_result.1 %}
             </td>
             <td>
                 {{ job|render_initiating_user }}

@@ -17,7 +17,7 @@ urlpatterns += patterns('',
 
     url(r'^(?P<project_id>\d+)/job/(?P<job_id>\d+)/htmlcov/(?P<filename>.+)$',
         'baleen.job.views.view_html_coverage', name='view_html_coverage'),
-    url(r'^(?P<project_id>\d+)/job/(?P<job_id>\d+)/(?P<action>[-\w]+)/htmlcov/(?P<filename>.+)$',
+    url(r'^(?P<project_id>\d+)/job/(?P<job_id>\d+)/(?P<action>[-_\w]+)/htmlcov/(?P<filename>.+)$',
         'baleen.job.views.view_specific_action_html_coverage',
         name='view_specific_action_html_coverage'),
 )

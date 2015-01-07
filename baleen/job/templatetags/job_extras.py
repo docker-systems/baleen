@@ -10,11 +10,14 @@ from baleen.job.models import Job
 register = template.Library()
 
 @register.inclusion_tag('job/show_coverage.html')
-def render_coverage(ar):
-    if not ar:
+def render_coverage(c_xml, c_html):
+    if not c_xml:
         return {}
-    if ar.job.started_at:
-        previous_job = Job.objects.filter(finished_at__lte=ar.job.started_at).first()
+
+    j = c_xml.job
+
+    if c_xml.job.started_at:
+        previous_job = Job.objects.filter(finished_at__lte=j.started_at).first()
 
     coverage_xml = None
     coverage_html = None
@@ -23,8 +26,8 @@ def render_coverage(ar):
     previous_coverage_xml = None
 
     try:
-        coverage_xml = CoverageXMLOutput.objects.get(action_result=ar)
-        coverage_html = CoverageHTMLOutput.objects.get(action_result=ar)
+        coverage_xml = CoverageXMLOutput.objects.get(action_result=c_xml)
+        coverage_html = CoverageHTMLOutput.objects.get(action_result=c_html)
     except (CoverageHTMLOutput.DoesNotExist, CoverageXMLOutput.DoesNotExist):
         pass
 
@@ -32,8 +35,8 @@ def render_coverage(ar):
         url = reverse(
                 'baleen.job.views.view_specific_action_html_coverage',
                 kwargs=dict(
-                    project_id=ar.job.project.id,
-                    job_id=ar.job.id,
+                    project_id=j.project.id,
+                    job_id=j.id,
                     filename='index.html',
                     action=slugify(coverage_html.action_result.action))
                 )

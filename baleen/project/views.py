@@ -13,6 +13,7 @@ from crispy_forms.layout import Submit
 import baleen.project.models as m
 from baleen.utils import get_credential_key_pair
 from baleen.project.forms import ProjectForm
+from baleen.artifact.models import output_types
 
 
 def flash(request, msg):
@@ -30,7 +31,11 @@ def index(request):
     projects = sorted(projects, key=get_last_job_time, reverse=True)
 
     context_instance=RequestContext(request)
-    return render_to_response('project/index.html', {'projects': projects}, context_instance)
+    return render_to_response('project/index.html',
+            {
+                'projects': projects,
+            },
+            context_instance)
 
 
 @login_required()
@@ -103,9 +108,29 @@ def show(request, project_id):
     form.helper.add_input(Submit('op', 'Save'))
     form.helper.add_input(Submit('op', 'Delete'))
 
+    jobs = p.job_set.order_by('-received_at')[:20]
+    jobs_with_test_results = []
+    for j in jobs:
+        jobs_with_test_results.append((
+            j,
+            j.get_action_result_with_output(output_types.XUNIT),
+            j.get_action_result_with_output(output_types.COVERAGE_XML),
+            j.get_action_result_with_output(output_types.COVERAGE_HTML)
+            ))
+
+    current_job = p.current_job()
+    if current_job:
+        cj = current_job
+        current_job = (
+                cj,
+                cj.get_action_result_with_output(output_types.XUNIT),
+                cj.get_action_result_with_output(output_types.COVERAGE_XML),
+                cj.get_action_result_with_output(output_types.COVERAGE_HTML)
+                )
+
     context = {
-        'jobs': p.job_set.order_by('-received_at')[:20],
-        'current_job': p.current_job(),
+        'jobs': jobs_with_test_results,
+        'current_job': current_job,
         'action_data': action_data,
         'form': form,
         'project': p,

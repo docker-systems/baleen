@@ -3,21 +3,21 @@
 {% with job=current_job %}
 {% with current_action=job.current_action %}
 <div class="row">
-    <div class="span4"><h4><a href="{% url 'view_job' project_id=project.id job_id=job.id %}">Current job</a> started <span class="time-age" data-time="{{ job.started_at|date:"c" }}"></span></h4></div>
+    <div class="span4"><h4><a href="{% url 'view_job' project_id=project.id job_id=job.0.id %}">Current job</a> started <span class="time-age" data-time="{{ job.0.started_at|date:"c" }}"></span></h4></div>
 </div>
 <div class="row">
     <div class="span8">Current action: {{ current_action }} running for <span class="time-diff" data-start="{{ current_action.started_at|date:"c" }}"><span></div>
 </div>
 <div class="row">
-    <div class="span4">Tests: {% render_xunit_summary job.test_action_result %} </div>
-    <div class="span4">Coverage: {% render_coverage job.test_action_result %} </div>
+    <div class="span4">Tests: {% render_xunit_summary job.1 %} </div>
+    <div class="span4">Coverage: {% render_coverage job.2 job.3 %} </div>
 </div>
 <div class="row">
     <div class="span4">What: 
-        {{ job|render_trigger }}
+        {{ job.0|render_trigger }}
     </div>
     <div class="span4">Who: 
-        {{ job|render_initiating_user }}
+        {{ job.0|render_initiating_user }}
     </div>
 </div>
 {% endwith %}

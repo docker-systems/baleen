@@ -12,8 +12,8 @@
         </tr>
     </thead>
     <tbody>
-{% for job in jobs %}
-{% if job != current_job %}
+{% for job, xunit_ar, coverage_ar, coverage_html_ar in jobs %}
+{% if job != current_job.0 %}
         <tr>
             {% if not job.started_at %}
                 <td>-</td>
@@ -27,10 +27,10 @@
                 <td><a href="{% url 'view_job' project_id=project.id job_id=job.id %}" class="time-diff" data-start="{{ job.started_at|date:"c" }}" {% if job.finished_at %}data-end="{{ job.finished_at|date:"c" }}"{% endif %}></a></td>
             {% endif %}
             <td>
-                {% render_xunit_summary job.test_action_result %}
+                {% render_xunit_summary xunit_ar %}
             </td>
             <td>
-                {% render_coverage job.test_action_result %}
+                {% render_coverage coverage_ar coverage_html_ar %}
             </td>
             <td>
                 {{ job|render_initiating_user }}

@@ -43,10 +43,10 @@
     {% endif %}
 
     <h3>Test Summary</h3>
-    <div>{% render_xunit_summary job.test_action_result %}</div>
+    <div>{% render_xunit_summary xunit_result %}</div>
 
     <h3>Test Coverage</h3>
-    <div>{% render_coverage job.test_action_result %}</div>
+    <div>{% render_coverage coverage_xml_result coverage_html_result %}</div>
 
     <h3>Actions</h2>
     {% for action_result in job.ordered_actions reversed %}
@@ -83,7 +83,7 @@
                         {% if action_result.message %} message: <pre>{{ action_result.message }}</pre> {% endif %}
                         </p>
                         {% if action_result.has_output %} 
-                            <div>{% render_coverage action_result %}</div>
+                            <div>{% render_coverage action_result action_result %}</div>
                             <div>{% render_xunit_summary action_result %}</div>
                             <div>{% render_xunit_failures action_result %}</div>
                         {% endif %}

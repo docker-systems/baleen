@@ -9,7 +9,8 @@ from django.conf import settings
 from contextlib import closing
 
 from baleen.action import Action
-from baleen.utils import mkdir_p, cd
+from baleen.utils import mkdir_p, cd, full_path_split
+from baleen.artifact.models import XUnitOutput, CoverageXMLOutput, CoverageHTMLOutput
 
 
 log = logging.getLogger('baleen.action.docker')
@@ -293,11 +294,36 @@ class GetBuildArtifactAction(Action):
         stderr = stderr.decode('utf-8')
         log.debug(str(self) + 'stdout: %s' % stdout)
         log.debug(str(self) + 'stderr: %s' % stderr)
+
+        if status == 0:
+            self.record_artifact(
+                    action_result,
+                    self.artifact_type,
+                    os.path.join(path, os.path.basename(self.artifact_path))
+                )
+
         return {
             'stdout': stdout,
             'stderr': stderr,
             'code': status,
         }
+
+    def record_artifact(self, ar, artifact_type, path):
+        if artifact_type == 'xunit':
+            with open(path, 'r') as f:
+                o = XUnitOutput(action_result=ar, output=f.read())
+                o.save()
+        elif artifact_type == 'coverage':
+            with open(path, 'r') as f:
+                o = CoverageXMLOutput(action_result=ar, output=f.read())
+                o.save()
+        elif artifact_type == 'coverage_html':
+            p = full_path_split(path)[-3:]
+            print('coverage html path is ' + str(p))
+            p = os.path.join(p)
+
+            o = CoverageHTMLOutput(action_result=ar, output=p)
+            o.save()
 
 
 class TagGoodImageAction(Action):

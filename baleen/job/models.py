@@ -232,6 +232,12 @@ class Job(models.Model):
     def test_action_result(self):
         return self.get_action_result_with_output(output_types.XUNIT)
 
+    def coverage_action_result(self):
+        return (
+               self.get_action_result_with_output(output_types.COVERAGE_XML),
+               self.get_action_result_with_output(output_types.COVERAGE_HTML)
+               )
+
     @property
     def current_action(self):
         return self.actionresult_set.order_by('-started_at').first()

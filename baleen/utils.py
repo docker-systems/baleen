@@ -102,3 +102,20 @@ def get_credential_key_pair(name, project=None, user=None):
         public = Credential(**pub_args)
         public.save()
     return priv, public
+
+
+def full_path_split(path):
+    folders=[]
+    while 1:
+        path,folder=os.path.split(path)
+
+        if folder!="":
+            folders.append(folder)
+        else:
+            if path!="":
+                folders.append(path)
+
+            break
+
+    folders.reverse()
+    return folders

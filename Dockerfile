@@ -29,5 +29,7 @@ RUN pip install -r requirements.txt
 # add all source
 ADD . /usr/local/baleen/.
 
+VOLUME ["/var/lib/baleen"]
+
 EXPOSE 5000
 CMD ["./docker_start.sh"]

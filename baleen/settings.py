@@ -181,9 +181,9 @@ NOSE_PLUGINS = [
 
 #SENDFILE_BACKEND = 'sendfile.backends.xsendfile'
 SENDFILE_BACKEND = 'sendfile.backends.simple'
-ARTIFACT_DIR = os.path.join(PROJECT_DIR, 'build_artifacts')
 
 BUILD_ROOT = '/var/lib/baleen/'
+ARTIFACT_DIR = os.path.join(BUILD_ROOT, 'build_artifacts')
 
 CRISPY_TEMPLATE_PACK = 'bootstrap'
 

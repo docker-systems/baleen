@@ -43,7 +43,8 @@ USE_TZ = True
 PROJECT_DIR = os.path.join(os.path.dirname(__file__), '..')
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/var/www/example.com/media/"
-MEDIA_ROOT = 'media'
+MEDIA_ROOT = '/var/lib/baleen/uploaded'
+
 
 SITE_URL = 'http://localhost:8000'
 

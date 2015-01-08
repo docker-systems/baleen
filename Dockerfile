@@ -29,6 +29,7 @@ RUN pip install -r requirements.txt
 # add all source
 ADD . /usr/local/baleen/.
 
+RUN python manage.py collectstatic --noinput
 VOLUME ["/var/lib/baleen"]
 
 EXPOSE 5000

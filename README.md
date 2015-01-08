@@ -14,23 +14,31 @@ something that solves our use case.
 
 ## Install
 
-```
-fig build
-fig up -d db
-fig run web python manage.py syncdb
-fig run web python manage.py migrate --all
-fig up
-```
+Suggested method of start up, for local development at least, is to 
+define `POSTGRES_USER` and `POSTGRES_PASSWORD` environment variables to pass
+through to fig (alternatively you can edit fig.yml to set them).
+Then run:
 
+```sh
+# Start up db by itself since it may take a moment to initialise
+fig up -d db
+# Start the web service, it will sync db models and perform migrations if
+# needed
+fig up
+# You'll need a super user
+fig run web python manage.py createsuperuser
+```
 
 ## Delete and use fresh db
 
-Because it was a challenge to figure out the simplest way to do this:
+If you get the db in a broken state and want to start from scratch:
 
-```
+```sh
 docker stop POSTGRES_CONTAINER_ID
 docker rm --volumes POSTGRES_CONTAINER_ID
 ```
+
+`POSTGRES_CONTAINER_ID` will probably be `baleen_db_1` if you're using fig.
 
 ## Overview of work to do
 

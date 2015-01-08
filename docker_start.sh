@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# 
+echo "Ensuring static resources are up to date..."
+./manage.py collectstatic --noinput
+
 echo "Running syncdb and any pending migrations..."
 ./manage.py syncdb --noinput --migrate
 

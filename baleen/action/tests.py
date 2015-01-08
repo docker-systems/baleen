@@ -245,8 +245,9 @@ class FetchFileActionTest(BaseActionTest):
             self.action.fetch_output(path, True, sftp_mock)
 
         ISDIR.side_effect = [True, True, False, False, False]
-        self.assertTrue(self.action.fetch_output(path, True, sftp_mock).startswith(
-                '/usr/local/baleen/baleen/../build_artifacts/rightnow'))
+        output_path = self.action.fetch_output(path, True, sftp_mock)
+        self.assertTrue(output_path.startswith(
+                '/var/lib/baleen/build_artifacts/rightnow'))
 
 
 class TestWithFigActionTest(BaseActionTest):

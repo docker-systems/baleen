@@ -6,7 +6,7 @@ django-reversion
 django-jsonify
 django-crispy-forms
 pygments
-django-allauth
+django-allauth==0.18.0
 django-sendfile
 requests
 django-polymorphic

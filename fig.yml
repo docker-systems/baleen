@@ -10,8 +10,10 @@ web:
    POSTGRES_USER:
   volumes_from:
     - "baleen-config"
+  # uncomment this if you want to do local development on baleen
+  # while it runs inside a container.
   #volumes:
-  #- /usr/local/d8o/baleen:/usr/local/baleen
+  #- /path/to/baleen/src:/usr/local/baleen
 db:
   image: postgres:9.4
   environment:

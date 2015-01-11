@@ -17,6 +17,21 @@ something that solves our use case.
 Suggested method of start up, for local development at least, is to 
 define `POSTGRES_USER` and `POSTGRES_PASSWORD` environment variables to pass
 through to fig (alternatively you can edit fig.yml to set them).
+
+You also need to setup a baleen config container. This allows you to provide
+your custom `local_settings.py` to the baleen container. To do so:
+
+```
+cp local_settings.TEMPLATE.py local_settings.py`
+# Make any changes to local_settings.py you like
+cat ../local_settings.py | \
+        docker run --volume /config -i --name baleen-config ubuntu \
+        /bin/bash -c 'cat > /config/local_settings.py'
+```
+
+The fig config is setup to use the `--volumes-from` directive against the
+baleen-config container.
+
 Then run:
 
 ```sh

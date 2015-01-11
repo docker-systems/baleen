@@ -8,8 +8,10 @@ web:
   environment:
    POSTGRES_PASSWORD:
    POSTGRES_USER:
-  volumes:
-   - /usr/local/d8o/baleen:/usr/local/baleen
+  volumes_from:
+    - "baleen-config"
+  #volumes:
+  #- /usr/local/d8o/baleen:/usr/local/baleen
 db:
   image: postgres:9.4
   environment:

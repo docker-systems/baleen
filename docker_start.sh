@@ -1,6 +1,6 @@
 #!/bin/sh
+export PYTHONPATH=/config:$PYTHONPATH
 
-# 
 echo "Ensuring static resources are up to date..."
 ./manage.py collectstatic --noinput
 

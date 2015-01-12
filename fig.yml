@@ -8,6 +8,7 @@ web:
   environment:
    POSTGRES_PASSWORD:
    POSTGRES_USER:
+   #SHELL: 1
   volumes_from:
     - "baleen-config"
   # uncomment this if you want to do local development on baleen

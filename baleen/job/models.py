@@ -40,9 +40,8 @@ class Job(models.Model):
     build_definition = models.TextField(null=True, blank=True)
     build_definition_type = models.CharField(max_length=64, null=True, blank=True) 
 
-    # TODO
-    #stash = JSONField(blank=True, null=True,
-            #help_text="Stash can have values written and read from during a build")
+    stash = JSONField(blank=True, null=True,
+            help_text="Stash can have values written and read from during a build")
 
     received_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -108,13 +107,13 @@ class Job(models.Model):
 
     def record_action_start(self, action):
         from baleen.project.models import ActionResult
-        a = ActionResult(action=action.name, job=self, started_at=now())
+        a = ActionResult(action=action.name, index=action.index, job=self, started_at=now())
         a.save()
         return a
 
     def record_action_response(self, action, response):
         from baleen.project.models import ActionResult
-        a = ActionResult.objects.get(action=action.name, job=self)
+        a = ActionResult.objects.get(action=action.name, index=action.index, job=self)
 
         a.status_code = response.get('code')
         if a.status_code is None:
@@ -168,14 +167,15 @@ class Job(models.Model):
         self.success = False
         self.worker_pid = pid
         self.finished_at = None
-        self.save()
         self.stash = {}
+        self.save()
 
     def record_done(self, success=True):
         self.success = success
         self.finished_at = now()
         self.worker_pid = None
         self.save()
+
         if not success and settings.MAILGUN_KEY:
             commits = None
             if self.github_data:

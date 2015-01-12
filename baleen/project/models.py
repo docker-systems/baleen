@@ -29,8 +29,6 @@ class Project(models.Model):
     repo_url = models.CharField(max_length=255, null=True, blank=True,
             verbose_name="Repository URL",
             help_text='URL to git repo')
-    #repo_sync_success = models.BooleanField(default=False, editable=False,
-            #help_text='Was the last attempt to sync with the repo successful?')
     creator = models.ForeignKey('auth.User', null=True)
 
     github_token = models.CharField(max_length=255, editable=False,
@@ -228,7 +226,7 @@ class ActionResult(models.Model):
     action = models.CharField(max_length=255)
     action_slug = models.CharField(max_length=255, blank=True)
 
-    #index = models.IntegerField()
+    index = models.IntegerField()
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True)
 

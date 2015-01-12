@@ -78,7 +78,7 @@ class JobTest(TestCase):
     def test_record_action_start(self):
         self.job.record_action_start(self.action)
 
-        result = ActionResult.objects.get(job=self.job, action=self.action.name)
+        result = ActionResult.objects.get(job=self.job, index=self.action.index, action=self.action.name)
         self.assertEqual(result.finished_at, None)
         self.assertEqual(result.status_code, None)
         self.assertEqual(result.job, self.job)

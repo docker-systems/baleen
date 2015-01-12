@@ -1,6 +1,8 @@
 import inspect
 import logging
+import traceback
 import re
+import sys
 
 from importlib import import_module
 
@@ -65,21 +67,34 @@ def _load_action_map(ACTION_MODULES):
     """
     action_map = {}
     for group, module in ACTION_MODULES.items():
-        action_module = import_module(module)
-        for name, obj in inspect.getmembers(action_module):
-            if inspect.isclass(obj) and issubclass(obj, Action):
-                if Action == obj or (
-                        getattr(obj, 'abstract', False) and
-                        not hasattr(obj, 'label')
-                        ):
-                    pass
-                else:
-                    l = get_label(obj)
-                    log.info("Found action %s:%s in module %s" % (group, l, module))
-                    action_map.setdefault(group, {})
-                    action_map[group][l] = obj
-            elif name == 'init_actions':
-                obj()
+        try:
+            action_map[group] = _load_module(group, module)
+        except Exception:
+            log.error("Exception while trying to load action module %s as group %s" %
+                    (module, group)
+                    )
+            print sys.exc_info()[0]
+            print traceback.format_exc()
+    return action_map
+
+
+def _load_module(group, module):
+    action_module = import_module(module)
+    action_map = {}
+    for name, obj in inspect.getmembers(action_module):
+        if inspect.isclass(obj) and issubclass(obj, Action):
+            if Action == obj or (
+                    getattr(obj, 'abstract', False) and
+                    not hasattr(obj, 'label')
+                    ):
+                pass
+            else:
+                l = get_label(obj)
+                log.info("Found action %s:%s in module %s" % (group, l, module))
+                action_map[l] = obj
+        elif name == 'init_actions':
+            log.info("Found init action for module %s" % (module,))
+            obj()
     return action_map
 
 
@@ -97,6 +112,10 @@ def get_action_object(action_details):
 
     action_cls = _action_map.get(group, {}).get(action)
     if action_cls is None:
+        log.info("Couldn't find action class for action %s:%s" % (group, action))
         raise NoSuchAction(details=ad)
 
+    log.info("Found action class %s for action %s:%s, initialising with %s" % (
+        action_cls, group, action, str(opts)
+        ))
     return action_cls(**opts)

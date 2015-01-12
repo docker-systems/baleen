@@ -69,7 +69,6 @@ class Action(object):
 
                 response = self.execute(stdoutlog, stderrlog, action_result)
             except Exception as e:
-                print "Got an exception %s" % (str(e),)
                 # Any exception that leaks from running the action has stuff recorded
                 # and is then raised to the caller
                 tb_str = traceback.format_exc(sys.exc_info()[2])
@@ -78,7 +77,7 @@ class Action(object):
                     'message': str(e),
                     'detail': tb_str 
                 })
-                print tb_str
+                log.error("Got an exception %s: %s" % (str(e), tb_str))
                 raise ActionFailure(e)
 
         job.record_action_response(self, response)
@@ -171,9 +170,10 @@ class ActionPlan(object):
 class DockerActionPlan(ActionPlan):
 
     def formulate_plan(self):
-        build_data = yaml.load(StringIO(self.build_definition))
+        build_data = yaml.safe_load(StringIO(self.build_definition))
         current_project = self.project
-        print build_data
+
+        log.debug("Build data for %s is: %s" % (self.project, build_data))
 
         if build_data is None:
             return []
@@ -229,7 +229,6 @@ class DockerActionPlan(ActionPlan):
         # whenever the dependencies are not satisfied, the plan will be to
         # try and deal to the dependencies first, while creating a post-success
         # hook waiting for them all.
-        print build_data
 
         plan.append({
                    'group': 'docker',

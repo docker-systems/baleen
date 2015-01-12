@@ -29,6 +29,8 @@ RUN pip install -r requirements.txt
 # add all source
 ADD . /usr/local/baleen/.
 
+RUN mkdir -p /var/lib/baleen
+
 # Ensure we don't have any left over pyc files when things get deleted
 # and generate bytecode so container will start fast as possible
 RUN find . -name '*.pyc' -delete && python -m compileall .

@@ -1,6 +1,7 @@
 import stat
 import logging
 import os
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -67,17 +68,18 @@ class GitAction(Action):
         return response
 
     def clone_repo(self, p):
+
         git = subprocess.Popen(
             ["git", "clone", p.repo_url, p.project_dir],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )
 
-        stdout, stderr = git.communicate()
+        stdoutdata, stderrdata = git.communicate()
         status = git.returncode
 
-        stdout = stdout.decode('utf-8')
-        stderr = stderr.decode('utf-8')
+        stdout = stdoutdata.decode('utf-8')
+        stderr = stderrdata.decode('utf-8')
         log.debug('Git clone stdout: %s' % stdout)
         log.debug('Git clone stderr: %s' % stderr)
         return {

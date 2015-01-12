@@ -1,4 +1,5 @@
 import os
+import logging
 import sys
 import traceback
 import gearman
@@ -18,6 +19,9 @@ from baleen.action.dispatch import get_action_object
 import statsd
 from statsd.counter import Counter
 from statsd import Timer
+
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger('baleen.worker')
 
 statsd.Connection.set_defaults(host='localhost', port=8125, sample_rate=1, disabled=True)
 
@@ -113,10 +117,11 @@ class Command(BaseCommand):
         # record this process id so that we can kill it via the web interface
         # supervisord will automatically create a replacement process.
 
-        print action
+        log.debug("Doing action %s" % action)
         a = get_action_object(action)
         self.current_action = a
         response = a.run(job)
+        log.debug("Action completed with response %s" % str(response))
         self.current_action = None
 
         if response['code'] != 0:
@@ -182,7 +187,6 @@ class Command(BaseCommand):
         for step in plan:
             action = get_action_object(step)
             action.run()
-
 
     def handle(self, *args, **options):
         self.current_gearman_job = None

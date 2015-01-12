@@ -1,6 +1,7 @@
 import subprocess
 import logging
 import os
+import sys
 import yaml
 import tempfile
 
@@ -31,12 +32,13 @@ def login_registry(registry, creds):
         stderr=subprocess.PIPE
         )
 
-    stdout, stderr = docker.communicate()
+    stdoutdata, stderrdata = docker.communicate()
     status = docker.returncode
+
     assert status == 0
 
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
+    stdout = stdoutdata.decode('utf-8')
+    stderr = stderrdata.decode('utf-8')
     return {
         'stdout': stdout,
         'stderr': stderr,

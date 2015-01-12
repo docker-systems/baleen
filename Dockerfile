@@ -36,6 +36,7 @@ RUN mkdir -p /var/lib/baleen
 RUN find . -name '*.pyc' -delete && python -m compileall .
 
 RUN python manage.py collectstatic --noinput
+ENV PYTHONPATH /config
 VOLUME ["/var/lib/baleen"]
 
 EXPOSE 5000

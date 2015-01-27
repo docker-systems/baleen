@@ -24,7 +24,7 @@ your custom `local_settings.py` to the baleen container. To do so:
 ```
 cp local_settings.TEMPLATE.py local_settings.py`
 # Make any changes to local_settings.py you like
-cat ../local_settings.py | \
+cat local_settings.py | \
         docker run --volume /config -i --name baleen-config ubuntu \
         /bin/bash -c 'cat > /config/local_settings.py'
 ```

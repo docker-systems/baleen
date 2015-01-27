@@ -229,8 +229,13 @@ LOGGING = {
 }
 
 try:
+    import inspect
+    import local_settings
+    # This is for debugging local_settings.py
+    print 'inspect.getfile(local_settings) is:', inspect.getfile(local_settings)
     from local_settings import *
-except ImportError:
+except ImportError as e:
+    print "Error loading local_settings.py - %s" % str(e)
     ALLOWED_HOSTS = []
 
 # This is to save us having to manually add domain of the GITHUB_HOOK_URL to

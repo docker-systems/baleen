@@ -5,6 +5,8 @@
 
 logs/*
 local_settings.py
+production_settings.py
+production_fig.yml
 supervisorctl.conf
 htmlcov/*
 .coverage

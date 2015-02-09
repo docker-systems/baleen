@@ -14,6 +14,44 @@ something that solves our use case.
 
 ![Project page](https://github.com/docker-systems/baleen/raw/master/docs/project_page.png)
 
+## What it will do
+
+It takes a git repository location and clones the repo. A `baleen.yml` file
+describes the container dependencies, what containers to build (a repo can
+define more than one container), and how to test the built containers.
+On success, the containers are tagged and pushed to a docker registry. Then the
+orchestration service is notified that new containers exist and they should be
+pulled and restarted.
+
+The two features we really needed which no one else provides (at the time we
+started this project) are:
+
+- *container dependencies for testing* - if you need certain containers to
+  exist, in order to do testing of the container behaviour, then you can. While
+  ideally you'd have unit tests without dependencies able to run during the
+  build process, not all systems are amiable to this approach. Additionally,
+  inter-container tests allow for system-level integration testing.
+- *automatic fetching of dependencies* - if you have 10 repositories which each
+  define a container that provides a microservice, then you can just include
+  a repositories that depends on the rest of them and Baleen will import the rest
+  and automatically create projects for each of them (assuming the repositories
+  each have a `baleen.yml` file.)
+
+In addition, it will allow dependencies to specifiy the git commit of
+a dependency that needs to be present and successfully built before the
+dependent container can build/test/deploy.
+
+This is liable to evolve.
+
+## What it currently does
+
+- Fetch a repo.
+- Build a container.
+- Test a container.
+- Extract test artifacts from test container (currently only supports Python's xunit.xml and
+  coverage.xml, htmlcov outputs).
+- Tag build container with `latest`
+
 ## Install
 
 Suggested method of start up, for local development at least, is to 
@@ -66,3 +104,9 @@ docker rm --volumes $POSTGRES_CONTAINER_ID
 IWMN want to use coreos as our platform for running containers. Smoothly
 integrating our baleen with coreos should will make deployment after a successful
 build easier.
+
+## Supporters
+
+This project is a collaboration between [Dragonfly
+Science](https://dragonfly.co.nz) and [iwantmyname](https://iwantmyname.com) to
+solve some of their challenges with reliably building and testing containers.

@@ -25,20 +25,26 @@ RUN pip install -r requirements.txt
 
 # Need to freakin' have some hosts, because we run git without
 # a tty stdin, so can't accept the unknown host prompt
-RUN mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+#
+# NOTE: this needs to be the same user as the baleen workers run as,
+# which is currently "root" as they need access to the docker daemon to
+# build containers.
+#
+# If we can eventually control the uid of the container, and assign it
+# to a "docker" group with access to the docker socket, then that user
+# will need this known_hosts file too.
+RUN mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts && cat ~/.ssh/known_hosts 
 
 # add all source
 ADD . /usr/local/baleen/.
 
-RUN chown -R baleen:baleen /usr/local/baleen /var/lib/baleen
-USER baleen
 # Ensure we don't have any left over pyc files when things get deleted
 # and generate bytecode so container will start fast as possible
 RUN find . -name '*.pyc' -delete && python -m compileall .
 
 RUN python manage.py collectstatic --noinput
 ENV PYTHONPATH /config
+RUN chown -R baleen:baleen /usr/local/baleen /var/lib/baleen
 VOLUME ["/var/lib/baleen"]
 
-EXPOSE 5000
 CMD ["./docker_start.sh"]

@@ -70,6 +70,7 @@ def _load_action_map(ACTION_MODULES):
         try:
             action_map[group] = _load_module(group, module)
         except Exception:
+            action_map[group] = None
             log.error("Exception while trying to load action module %s as group %s" %
                     (module, group)
                     )
@@ -110,9 +111,19 @@ def get_action_object(action_details):
     action = ad.pop('action')
     opts = ad
 
-    action_cls = _action_map.get(group, {}).get(action)
+    action_group = _action_map.get(group, {})
+    action_cls = action_group.get(action)
     if action_cls is None:
-        log.info("Couldn't find action class for action %s:%s" % (group, action))
+        if action_group is None:
+            log.info("Couldn't find action group or class for action %s:%s"
+                    % (group, action)
+                    )
+        else:
+            log.info("Couldn't find action class for action %s:%s, action group "
+                    + "was present, so this could indicate a configuration issue."
+                    % (group, action)
+                    )
+            log.info("Action group was present however, " % (group, action))
         raise NoSuchAction(details=ad)
 
     log.info("Found action class %s for action %s:%s, initialising with %s" % (

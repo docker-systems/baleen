@@ -17,10 +17,18 @@ def home(request):
 def github(request, github_token):
     if request.method != 'POST':
         raise Http404
+
     project = get_object_or_404(Project, github_token=github_token)
 
-    github_data = json.loads(request.POST['payload'])
+    # catch the ping
+    if request.META.get('HTTP_X_GITHUB_EVENT', 'push') == 'ping':
+        project.github_data_received = True
+        project.save()
+        return HttpResponse('processed')
 
+    github_data = json.loads(request.body)
+
+    # Only let pushes to the branch we care about through...
     if project.branch:
         if not 'ref' in github_data:
             return HttpResponse('processed')
@@ -33,9 +41,11 @@ def github(request, github_token):
         if 'tmp' in c:
             del c['tmp']
 
+    # Mark the project as having received data
     project.github_data_received = True
     project.save()
 
+    # Submit the job!
     job = Job(project=project, github_data=github_data)
     job.save()
     job.submit()

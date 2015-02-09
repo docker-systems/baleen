@@ -191,7 +191,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap'
 GEARMAN_SERVER = 'localhost'
 GEARMAN_JOB_LABEL = 'baleen_job'
 
-GITHUB_HOOK_URL = SITE_URL + '/hub'
+GITHUB_HOOK_URL = SITE_URL
 
 ACTION_MODULES = {
     'project': "baleen.action.project",
@@ -242,7 +242,7 @@ except ImportError as e:
 # our ALLOWED_HOSTS settings
 from urlparse import urlparse
 github_url_parsed = urlparse(GITHUB_HOOK_URL)
-ALLOWED_HOSTS.append( github_url_parsed.scheme + "://" + github_url_parsed.netloc )
+ALLOWED_HOSTS.append( github_url_parsed.netloc )
 
 import sys
 #if manage.py test was called, use test settings

@@ -12,6 +12,8 @@ We'll be trying to make it play nicely with docker orchestration tools (the
 official ones as well as third party), but our main priority is creating
 something that solves our use case.
 
+![Project page](https://github.com/docker-systems/baleen/raw/master/docs/project_page.png)
+
 ## Install
 
 Suggested method of start up, for local development at least, is to 

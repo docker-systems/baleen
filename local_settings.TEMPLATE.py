@@ -33,7 +33,7 @@ DEBUG = False
 ADMINS = ( ('admin','admin@example.com'), )
 SITE_URL = ''
 SECRET_KEY = ''
-GITHUB_HOOK_URL = SITE_URL + '/hub'
+GITHUB_HOOK_URL = SITE_URL
 BALEEN_EMAIL = "Baleen <baleen@example.com>"
 
 MAILGUN_KEY = '',

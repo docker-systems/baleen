@@ -49,15 +49,14 @@ class GitAction(Action):
     def execute(self, stdoutlog, stderrlog, action_result):
         # ensure BUILD_ROOT exists
         mkdir_p(settings.BUILD_ROOT)
-        p = self.project
 
-        identity_fn = self.write_ssh_identity(p.private_key.value)
+        identity_fn = self.write_ssh_identity(self.project.private_key.value)
         git_ssh_fn = self.write_git_wrapper(identity_fn)
 
         os.environ['GIT_SSH'] = git_ssh_fn
         
-        with cd(settings.BUILD_ROOT):
-            response = self.git_action(p)
+        with cd(self.job.job_dirs['checkout']):
+            response = self.git_action(self.job)
         del os.environ['GIT_SSH']
 
         # Clean up after outselves
@@ -67,10 +66,13 @@ class GitAction(Action):
             response['success'] = False
         return response
 
-    def clone_repo(self, p):
+    def clone_repo(self, job):
 
         git = subprocess.Popen(
-            ["git", "clone", p.repo_url, p.project_dir],
+            ["git", "clone",
+                job.project.repo_url,
+                job.job_dirs['build']
+                ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )
@@ -88,8 +90,8 @@ class GitAction(Action):
             'code': status,
         }
 
-    def pull_repo(self, p):
-        with cd(p.project_dir):
+    def pull_repo(self, job):
+        with cd(self.job.job_dirs['build']):
             git = subprocess.Popen(
                 ["git", "pull", "origin", "master"],
                 stdout=subprocess.PIPE,
@@ -112,27 +114,28 @@ class GitAction(Action):
 
 class CloneRepoAction(GitAction):
 
-    def git_action(self, p):
-        if os.path.exists(p.project_dir):
-            shutil.rmtree(p.project_dir)
+    def git_action(self, job):
+        d = job.job_dirs['build']
+        if os.path.exists(d):
+            shutil.rmtree(d)
 
-        return self.clone_repo(p)
+        return self.clone_repo(job)
  
 
 class SyncRepoAction(GitAction):
 
-    def git_action(self, p):
-        if not os.path.exists(p.project_dir):
-            response = self.clone_repo(p)
+    def git_action(self, job):
+        if not os.path.exists(job.job_dirs['build']):
+            response = self.clone_repo(job)
         else:
-            response = self.pull_repo(p)
+            response = self.pull_repo(job)
         return response
 
 
 class ImportBuildDefinitionAction(Action):
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        full_path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        full_path = self.job.job_dirs['build']
         with cd(full_path):
             with open('baleen.yml') as fd:
                 raw_plan = fd.read()

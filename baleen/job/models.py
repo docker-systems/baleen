@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 
 from baleen.artifact.models import ActionOutput, output_types
+from baleen.utils import mkdir_p
 
 from jsonfield import JSONField
 
@@ -88,7 +89,6 @@ class Job(models.Model):
                 },
             ]
         
-
     def action_plan(self):
         """
         Work out what kind of build definition we're working with and return
@@ -194,6 +194,24 @@ class Job(models.Model):
                       "text": "One of these commits %s has broken %s!" % (compare, name)})
 
     @property
+    def job_dirs(self):
+        if hasattr(self, '_job_dirs'):
+            return self._job_dirs
+        else:
+            return {
+                "checkout": settings.BUILD_ROOT,
+                "build": os.path.join(
+                    settings.BUILD_ROOT,
+                    self.project.project_dir),
+                "artifact": os.path.join(
+                    settings.ARTIFACT_DIR,
+                    self.project.project_dir,
+                    str(self.id)
+                    ),
+                "logs": os.path.join(settings.PROJECT_DIR, 'logs')
+            }
+
+    @property
     def done(self):
         return self.finished_at is not None
 
@@ -216,7 +234,8 @@ class Job(models.Model):
 
     def get_live_job_filenames(self):
         p = self.project
-        log_dir = os.path.join(settings.PROJECT_DIR, 'logs')
+        log_dir = self.job_dirs['logs']
+        mkdir_p(log_dir)
         out_f = os.path.join(log_dir, '%s-%s-stdout.log' % (p.name, p.id))
         err_f = os.path.join(log_dir, '%s-%s-stderr.log' % (p.name, p.id))
         return out_f, err_f

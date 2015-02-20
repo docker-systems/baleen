@@ -1,7 +1,6 @@
 import subprocess
 import logging
 import os
-import sys
 import yaml
 import tempfile
 
@@ -75,7 +74,7 @@ class BuildImageAction(Action):
         self.job.stash['docker_image'] = self.image_name
         self.job.stash['docker_tag'] = self.docker_tag
 
-        path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        path = self.job.job_dirs["build"]
         with cd(path):
             docker = subprocess.Popen(
                 ["docker", "build", "-t",
@@ -273,11 +272,7 @@ class GetBuildArtifactAction(Action):
 
     def execute(self, stdoutlog, stderrlog, action_result):
         CONTAINER_NAME = self.job.stash['fig_test_container']
-        path = os.path.join(
-                settings.ARTIFACT_DIR,
-                self.project.project_dir,
-                str(self.job.id)
-                )
+        path = self.job.job_dirs['artifact']
         mkdir_p(path)
 
         docker = subprocess.Popen(
@@ -334,7 +329,7 @@ class TagGoodImageAction(Action):
         return "TagGoodImageAction: %s" % self.name
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        path = self.job.job_dirs['build']
         with cd(path):
             docker = subprocess.Popen(
                 ["docker", "tag",

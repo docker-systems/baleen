@@ -37,6 +37,9 @@ class Action(object):
     def __unicode__(self):
         return "Action: %s" % self.name
 
+    def __str__(self):
+        return self.__unicode__()
+
     def send_event_hooks(self, status):
         event = {
             'type': 'action',
@@ -45,7 +48,6 @@ class Action(object):
         }
         gearman_client = gearman.GearmanClient([settings.GEARMAN_SERVER])
         gearman_client.submit_job(settings.GEARMAN_JOB_LABEL, json.dumps({'event': event}), background=True)
-
     
     @property
     def statsd_name(self):

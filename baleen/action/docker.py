@@ -289,8 +289,8 @@ class GetBuildArtifactAction(Action):
 
         stdout = stdout.decode('utf-8')
         stderr = stderr.decode('utf-8')
-        log.debug(str(self) + 'stdout: %s' % stdout)
-        log.debug(str(self) + 'stderr: %s' % stderr)
+        log.debug(str(self) + ' stdout: %s' % stdout)
+        log.debug(str(self) + ' stderr: %s' % stderr)
 
         if status == 0:
             self.record_artifact(

@@ -214,8 +214,18 @@ class Command(BaseCommand):
         return result
 
     def build(self, build_dir):
-        project_name = os.path.basename(build_dir)
-        p = Project(name=project_name)
+        p = None
+        project_name = None
+        counter = 1
+        while p is None:
+            project_name = os.path.basename(build_dir) + str(counter)
+            try:
+                Project.objects.get(name=project_name)
+                counter += 1
+            except Project.DoesNotExist:
+                p = Project(name=project_name)
+            if counter > 100:
+                raise Exception("Can't find a free project name.")
         p.save()
         job = Job(project=p, manual_by=p.creator)
         job.save()
@@ -249,9 +259,6 @@ class Command(BaseCommand):
             self._reset_jobs()
 
             print "Job completed."
-            # Return empty string since this is always invoked in background mode, so
-            # no-one would see the response anyway
-            return ''
         except Exception, e:
             msg = "Unexpected error:" + str(sys.exc_info()[0])
             msg += str(e)

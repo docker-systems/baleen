@@ -59,7 +59,7 @@ class ActionOutput(models.Model):
             default=output_types.STDOUT)
 
     output = models.TextField(null=True, blank=True)
-    data = JSONField()
+    data = JSONField(blank=True, null=True)
 
     objects = ManagerWithFirstQuery()
 

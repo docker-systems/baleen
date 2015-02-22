@@ -319,8 +319,7 @@ class GetBuildArtifactAction(Action):
                 o.save()
         elif artifact_type == 'coverage_html':
             p = full_path_split(path)[-3:]
-            print('coverage html path is ' + str(p))
-            p = os.path.join(p)
+            p = os.path.join(*p)
 
             o = CoverageHTMLOutput(action_result=ar, output=p)
             o.save()

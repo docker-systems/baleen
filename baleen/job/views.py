@@ -6,10 +6,7 @@ from django.shortcuts import get_object_or_404, render_to_response, render, get_
 from django.http import HttpResponseBadRequest, HttpResponse, Http404
 from django.template import RequestContext
 
-from jsonify.decorators import ajax_request
 from sendfile import sendfile
-
-import json
 
 from baleen.project.models import ActionResult
 from baleen.job.models import Job

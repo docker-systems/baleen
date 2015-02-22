@@ -1,14 +1,22 @@
+import os
 import unittest
+import tempfile
 
 from StringIO import StringIO
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.utils.timezone import now
 
 from mock import Mock, patch
 
 from baleen.action.ssh import RunCommandAction, FetchFileAction
 from baleen.action.project import CreateAction
+from baleen.action.docker import (
+        TestWithFigAction,
+        BuildImageAction,
+        GetBuildArtifactAction
+        )
 
 from baleen.action import (
         ExpectedActionOutput,
@@ -16,9 +24,9 @@ from baleen.action import (
         DockerActionPlan
         )
 
-from baleen.project.models import Project, Hook
+from baleen.project.models import Project, Hook, Credential, ActionResult
 from baleen.job.models import Job
-from baleen.artifact.models import output_types
+from baleen.artifact.models import output_types, XUnitOutput
 
 class ActionPlanTest(TestCase):
 
@@ -126,8 +134,10 @@ class BaseActionTest(TestCase):
     def setUp(self):
         self.project = Project(name='TestProject')
         self.project.save()
-        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
-                username='foo', command='echo "blah"')
+
+        the_plan = ''
+        self.job = Job(project=self.project, build_definition=the_plan)
+        self.job.save()
 
         self.user = User.objects.create_user('bob', 'bob@bob.com', 'bob')
         self.user.save()
@@ -136,6 +146,9 @@ class BaseActionTest(TestCase):
 class ActionTest(BaseActionTest):
 
     def test_statsd_name(self):
+        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
         self.assertEqual(self.action.statsd_name, 'testaction')
         self.action.name = 'test*(&#$*&*(@$#'
         self.assertEqual(self.action.statsd_name, 'test')
@@ -157,6 +170,9 @@ class ActionTest(BaseActionTest):
 class RunCommandActionTest(BaseActionTest):
 
     def test_authorized_keys_entry(self):
+        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
         keys = self.action.authorized_keys_entry
         self.assertTrue('no-agent-forwarding' in keys)
 
@@ -170,6 +186,9 @@ class RunCommandActionTest(BaseActionTest):
     @patch('gearman.GearmanClient')
     @patch('baleen.action.ssh.RunCommandAction._run_command')
     def test_execute(self, run_mock, gearman_mock, sftp_mock, ssh_mock):
+        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
         stdout = StringIO()
         stderr = StringIO()
         run_mock.return_value = {'code': 0}
@@ -181,6 +200,9 @@ class RunCommandActionTest(BaseActionTest):
         self.action.execute(stdout, stderr, None)
 
     def test_run_command(self):
+        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
+                username='foo', command='echo "blah"')
+
         stdout = StringIO()
         stderr = StringIO()
         m = Mock()
@@ -254,5 +276,67 @@ class TestWithFigActionTest(BaseActionTest):
 
     def setUp(self):
         super(TestWithFigActionTest, self).setUp()
-        self.action = TestWithFigActionTest(project=self.project.name, index=0, name='TestAction',
-                username='foo', path='/rightnow')
+        self.fig_raw_data = """
+subject:
+  image: "docker.domarino.com/api"
+  command: ./run_tests.sh
+"""
+        self.action = TestWithFigAction(project=self.project.name, index=0,
+                name='TestWithFigAction',
+                fig_data=self.fig_raw_data)
+        self.credential = Credential(project=self.project, name="BLAH", value="hello")
+        self.credential.save()
+
+    def test_inject_baleen_data(self):
+        injected_data = self.action._inject_baleen_data(
+                self.action.fig_data,
+                credentials= { "BLAH": "VALUE", "BLAH2": "FILE" },
+                stash = {
+                    'docker_tag': 'womp',
+                    'docker_image': 'test_image'
+                    }
+                )
+        subject = injected_data.get('subject')
+        self.assertTrue('environment' in subject, "environment injected")
+        self.assertEqual(subject['environment'],
+                {'BLAH2': None, 'BLAH': 'hello'},
+                "inject environment has both keys")
+        self.assertEqual(subject['image'],
+                'docker.domarino.com/api:womp',
+                "image has stash's tag appended")
+
+
+class BuildImageActionTest(BaseActionTest):
+
+    def setUp(self):
+        super(BuildImageActionTest, self).setUp()
+
+        self.action = BuildImageAction(project=self.project.name, index=0,
+                name='BuildImageAction')
+
+
+class GetBuildArtifactActionTest(BaseActionTest):
+
+    def setUp(self):
+        super(GetBuildArtifactActionTest, self).setUp()
+
+        self.action = GetBuildArtifactAction(project=self.project.name, index=0,
+                name='GetBuildArtifactAction',
+                location={'path': '/tmp/blah'},
+                artifact_type='xunit'
+                )
+        fd, self.temp_output_fn = tempfile.mkstemp()
+        from contextlib import closing
+        with closing(os.fdopen(fd, 'w')) as ft:
+            ft.write('test')
+
+    def tearDown(self):
+        os.remove(self.temp_output_fn)
+
+    def test_record_artifact(self):
+        ar = ActionResult(action=self.action.name, index=self.action.index, job=self.job, started_at=now())
+        ar.save()
+
+        self.action.record_artifact(ar, 'xunit', self.temp_output_fn)
+
+        self.assertEqual(XUnitOutput.objects.count(), 1, "Creating output for action")

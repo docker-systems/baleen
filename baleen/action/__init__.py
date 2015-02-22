@@ -232,17 +232,22 @@ class DockerActionPlan(ActionPlan):
         # try and deal to the dependencies first, while creating a post-success
         # hook waiting for them all.
 
-        plan.append({
-                   'group': 'docker',
-                   'action': 'test_with_fig',
-                   'name': 'Test with fig',
-                   'index': index,
-                   'fig_data': build_data.get('test'), #'fig_test.yml',
-                   'project': self.project.name,
-                })
-        index += 1
+        if build_data.get('test'):
+            plan.append({
+                       'group': 'docker',
+                       'action': 'test_with_fig',
+                       'name': 'Test with fig',
+                       'index': index,
+                       'fig_data': build_data.get('test'), #'fig_test.yml',
+                       'project': self.project.name,
+                    })
+            index += 1
 
-        for artifact_type, details in build_data.get('artifacts', {}).items():
+        for artifact_type, location in build_data.get('artifacts', {}).items():
+            if build_data.get('test'):
+                # TODO support doing a null run of a container and extracting
+                # artifacts from just the build process
+                raise Exception("artifacts key specified but no test!")
             plan.append({
                        'group': 'docker',
                        'action': 'get_build_artifact',
@@ -250,7 +255,7 @@ class DockerActionPlan(ActionPlan):
                        'name': 'Get build artifact ' + artifact_type,
                        'index': index + 1,
                        'artifact_type': artifact_type,
-                       'path': details.get('path')
+                       'location': location
                     })
             index += 1
 

@@ -262,7 +262,7 @@ class Command(BaseCommand):
         except Exception, e:
             msg = "Unexpected error:" + str(sys.exc_info()[0])
             msg += str(e)
-            print msg
+            print(msg)
             traceback.print_tb(sys.exc_info()[2])
 
             self.clear_current_action(msg)
@@ -273,7 +273,6 @@ class Command(BaseCommand):
 
     def clear_current_action(self, msg=None):
         if self.current_action:
-            print "have action, record action response"
             if msg is None:
                 msg = "Action was interrupted by kill/term signal."
 
@@ -285,7 +284,6 @@ class Command(BaseCommand):
             except ActionResult.DoesNotExist:
                 self.current_baleen_job.record_done(success=False)
         elif self.current_baleen_job:
-            print "no action, just done"
             self.current_baleen_job.record_done(success=False)
 
     def clean_up(self, *args):

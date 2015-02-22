@@ -244,7 +244,7 @@ class DockerActionPlan(ActionPlan):
             index += 1
 
         for artifact_type, location in build_data.get('artifacts', {}).items():
-            if build_data.get('test'):
+            if not build_data.get('test'):
                 # TODO support doing a null run of a container and extracting
                 # artifacts from just the build process
                 raise Exception("artifacts key specified but no test!")

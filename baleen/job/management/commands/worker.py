@@ -13,8 +13,9 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from baleen.job.models import Job
-from baleen.project.models import ActionResult
+from baleen.project.models import ActionResult, Project
 from baleen.action.dispatch import get_action_object
+from baleen.utils import mkdir_p, cd
 
 import statsd
 from statsd.counter import Counter
@@ -61,11 +62,11 @@ class Command(BaseCommand):
                 dest='clear_jobs',
                 help="Clear all jobs in queue, don't run them."
             ),
-            make_option('-r', '--raw-plan',
+            make_option('-b', '--build',
                 default=None,
                 action='store',
-                dest='raw_plan',
-                help="Take a json file as the action plan, run it and exit"
+                dest='build',
+                help="Take a directory with a baleen.yml and build it."
             ),
         )
 
@@ -113,7 +114,7 @@ class Command(BaseCommand):
             self._reset_jobs()
         return ''
 
-    def _do_action(self, job, action, project_timer):
+    def _do_action(self, job, action, project_timer=None):
         # record this process id so that we can kill it via the web interface
         # supervisord will automatically create a replacement process.
 
@@ -128,7 +129,8 @@ class Command(BaseCommand):
             # If we got a non-zero exit status, then don't run any more actions
             raise Exception('Non-zero exit code')
 
-        project_timer.intermediate(a.statsd_name)
+        if project_timer:
+            project_timer.intermediate(a.statsd_name)
         print "Action success."
 
 
@@ -183,11 +185,6 @@ class Command(BaseCommand):
         # no-one would see the response anyway
         return ''
 
-    def process_plan(self, plan):
-        for step in plan:
-            action = get_action_object(step)
-            action.run()
-
     def handle(self, *args, **options):
         self.current_gearman_job = None
         self.current_baleen_job = None
@@ -195,19 +192,18 @@ class Command(BaseCommand):
 
         self.worker_process_number = options['worker_number']
 
-        if options['raw_plan']:
-            with open(options['raw_plan']) as f:
-                plan_data = json.load(f)
-            self.process_plan(plan_data)
+        signal(SIGTERM, self.clean_up)
+        signal(SIGINT, self.clean_up)
+
+        if options['build']:
+            self.build(options['build'])
+            sys.exit(0)
         elif options['clear_jobs']:
             print "Removing all jobs in queue..."
             gearman_worker.register_task(settings.GEARMAN_JOB_LABEL, functools.partial(self.clear_job))
         else:
             # Default is to wait for jobs
             gearman_worker.register_task(settings.GEARMAN_JOB_LABEL, functools.partial(self.run_task))
-
-        signal(SIGTERM, self.clean_up)
-        signal(SIGINT, self.clean_up)
 
         print "baleen worker reporting for duty, sir/m'am!"
         gearman_worker.work()
@@ -217,9 +213,66 @@ class Command(BaseCommand):
         result = "Clearing job for job_id %d" % str(job_id)
         return result
 
+    def build(self, build_dir):
+        p = None
+        project_name = None
+        counter = 1
+        while p is None:
+            project_name = os.path.basename(build_dir) + str(counter)
+            try:
+                Project.objects.get(name=project_name)
+                counter += 1
+            except Project.DoesNotExist:
+                p = Project(name=project_name)
+            if counter > 100:
+                raise Exception("Can't find a free project name.")
+        p.save()
+        job = Job(project=p, manual_by=p.creator)
+        job.save()
+
+        self.current_baleen_job = job
+
+        try:
+            job._job_dirs = {
+                    'build': build_dir,
+                    'artifact': os.path.join('/tmp/', project_name),
+                    'logs': os.path.join('/tmp/', project_name),
+                    'checkout': None
+                    }
+            job.record_start(os.getpid())
+
+            # import baleen file
+            import_action_spec = {
+                   'group': 'project',
+                   'action': 'import_build_definition',
+                   'name': 'Import build definition for project %s' % p.name,
+                   'index': 1,
+                   'project': p.name
+                }
+            self._do_action(job, import_action_spec)
+
+            actions = job.project.action_plan()
+            for action in actions:
+                self._do_action(job, action)
+
+            job.record_done()
+            self._reset_jobs()
+
+            print "Job completed."
+        except Exception, e:
+            msg = "Unexpected error:" + str(sys.exc_info()[0])
+            msg += str(e)
+            print(msg)
+            traceback.print_tb(sys.exc_info()[2])
+
+            self.clear_current_action(msg)
+            self._reset_jobs()
+
+        p.delete()
+
+
     def clear_current_action(self, msg=None):
         if self.current_action:
-            print "have action, record action response"
             if msg is None:
                 msg = "Action was interrupted by kill/term signal."
 
@@ -230,8 +283,7 @@ class Command(BaseCommand):
                 })
             except ActionResult.DoesNotExist:
                 self.current_baleen_job.record_done(success=False)
-        else:
-            print "no action, just done"
+        elif self.current_baleen_job:
             self.current_baleen_job.record_done(success=False)
 
     def clean_up(self, *args):

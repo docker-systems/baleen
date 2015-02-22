@@ -32,8 +32,10 @@ class ProjectTest(TestCase):
 
     @patch('gearman.GearmanClient')
     def test_github_hook(self, gearman):
-        data = {'payload': json.dumps({'commits': []})}
-        response = self.client.post(reverse('github_url', kwargs={'github_token': self.project.github_token}), data=data)
+        data = {'commits': [], 'ref': "refs/heads/master"}
+        response = self.client.post(reverse('github_url', kwargs={'github_token': self.project.github_token}),
+                json.dumps(data),
+                content_type="application/json")
         self.assertContains(response, 'processed')
 
 

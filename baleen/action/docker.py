@@ -1,7 +1,6 @@
 import subprocess
 import logging
 import os
-import sys
 import yaml
 import tempfile
 
@@ -15,7 +14,6 @@ from baleen.artifact.models import XUnitOutput, CoverageXMLOutput, CoverageHTMLO
 
 
 log = logging.getLogger('baleen.action.docker')
-
 
 def login_registry(registry, creds):
     """
@@ -39,6 +37,7 @@ def login_registry(registry, creds):
 
     stdout = stdoutdata.decode('utf-8')
     stderr = stderrdata.decode('utf-8')
+
     return {
         'stdout': stdout,
         'stderr': stderr,
@@ -75,7 +74,7 @@ class BuildImageAction(Action):
         self.job.stash['docker_image'] = self.image_name
         self.job.stash['docker_tag'] = self.docker_tag
 
-        path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        path = self.job.job_dirs["build"]
         with cd(path):
             docker = subprocess.Popen(
                 ["docker", "build", "-t",
@@ -127,24 +126,22 @@ class TestWithFigAction(Action):
         self.fig_data = yaml.load(StringIO(self.fig_raw_data))
         self.volume_dir = None
 
-    def _inject_baleen_data(self, data):
+    def _inject_baleen_data(self, data, credentials, stash):
         from baleen.project.models import Credential
-
-        build_data = yaml.load(StringIO(self.job.build_definition))
 
         for container in data.keys():
             if 'image' in data[container]:
                 image = data[container]['image']
             else:
-                image = self.job.stash['docker_image']
+                image = stash['docker_image']
             image_parts = image.rsplit(':')
             if len(image_parts) > 1:
                 image = image_parts[0] 
-            data[container]['image'] = image + ':' + self.job.stash['docker_tag']
+            data[container]['image'] = image + ':' + stash['docker_tag']
 
-            if 'credentials' in build_data:
+            if credentials:
                 data[container].setdefault('environment', {})
-                for c_name, value in build_data['credentials'].items():
+                for c_name, value in credentials.items():
                     try:
                         c = Credential.objects.get(project=self.project, name=c_name)
                         val = c.value
@@ -170,7 +167,12 @@ class TestWithFigAction(Action):
         return identity_fn
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        fig_data_with_images = self._inject_baleen_data(self.fig_data)
+        build_data = yaml.load(StringIO(self.job.build_definition))
+
+        fig_data_with_images = self._inject_baleen_data(self.fig_data,
+                build_data.get('credentials'),
+                self.job.stash
+                )
         # Set the FIG_PROJECT_NAME environment variable to build id
         # to avoid concurrent builds getting funky:
         # https://github.com/docker/fig/issues/748
@@ -265,7 +267,7 @@ class GetBuildArtifactAction(Action):
 
     def __init__(self, project, name, index, *arg, **kwarg):
         super(GetBuildArtifactAction, self).__init__(project, name, index)
-        self.artifact_path = kwarg.get('path')
+        self.artifact_path = kwarg.get('location', {}).get('path')
         self.artifact_type = kwarg.get('artifact_type')
 
     def __unicode__(self):
@@ -273,11 +275,7 @@ class GetBuildArtifactAction(Action):
 
     def execute(self, stdoutlog, stderrlog, action_result):
         CONTAINER_NAME = self.job.stash['fig_test_container']
-        path = os.path.join(
-                settings.ARTIFACT_DIR,
-                self.project.project_dir,
-                str(self.job.id)
-                )
+        path = self.job.job_dirs['artifact']
         mkdir_p(path)
 
         docker = subprocess.Popen(
@@ -294,8 +292,8 @@ class GetBuildArtifactAction(Action):
 
         stdout = stdout.decode('utf-8')
         stderr = stderr.decode('utf-8')
-        log.debug(str(self) + 'stdout: %s' % stdout)
-        log.debug(str(self) + 'stderr: %s' % stderr)
+        log.debug(str(self) + ' stdout: %s' % stdout)
+        log.debug(str(self) + ' stderr: %s' % stderr)
 
         if status == 0:
             self.record_artifact(
@@ -334,7 +332,7 @@ class TagGoodImageAction(Action):
         return "TagGoodImageAction: %s" % self.name
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        path = os.path.join(settings.BUILD_ROOT, self.project.project_dir)
+        path = self.job.job_dirs['build']
         with cd(path):
             docker = subprocess.Popen(
                 ["docker", "tag",

@@ -48,3 +48,30 @@ DOCKER_REGISTRIES = {
         'email': '',
     }
 }
+
+# Example logging to console if the default isn't showing you enough info.
+#LOGGING = {
+    #'version': 1,
+    ## set to True will disable all logging except that specified, unless
+    ## nothing is specified except that django.db.backends will still log,
+    ## even when set to True, so disable explicitly
+    #'disable_existing_loggers': True,
+    #'handlers': {
+        #'null': {
+            #'level': 'DEBUG',
+            #'class': 'django.utils.log.NullHandler',
+            #},
+        #'console': {
+            #'level': 'DEBUG',
+            #'class': 'logging.StreamHandler',
+            #},
+        #},
+    #'loggers': {
+        ## Comment or Uncomment these to turn on/off logging output
+        #'django.db.backends': {
+            #'handlers': ['null'],
+            #'propagate': False,
+            #},
+    #}
+#}
+

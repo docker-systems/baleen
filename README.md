@@ -87,6 +87,43 @@ POSTGRES_USER=baleen POSTGRES_PASSWORD=baleen fig up
 fig run web python manage.py createsuperuser
 ```
 
+## Testing your baleen.yml
+
+It can be annoying to have to iterative update your `baleen.yml` to ensure it's
+working. Each time you want to make a change, you have to push and wait for the
+baleen web UI to show progress (not always returning detailed errors, since
+there are sometimes edge conditions we haven't handled).
+
+To test your repo with a `baleen.yml`, first edit `fig.yml` so that the repo is
+accessable to the container. e.g. 
+
+```yaml
+web:
+  # ...
+  volumes:
+   - /path/to/your/repo:/usr/local/repo
+```
+
+Then 
+
+```sh
+# Ensure the DB is running
+POSTGRES_USER=baleen POSTGRES_PASSWORD=baleen fig up -d db
+# Get a shell
+POSTGRES_USER=baleen POSTGRES_PASSWORD=baleen fig run web /bin/bash
+# Inside the container:
+./manage.py worker --build /usr/local/repo
+```
+
+This will run the build process in the foreground. Notes:
+
+- At the moment it still needs to make temporary records in the database, but
+  eventually the plan is to separate the execution model from the persistence
+  layer.
+- The output depends on your `LOGGING` setting. There is an example in
+  `local_settings.TEMPLATE.py` to dump all DEBUG statements to console
+  if the output doesn't have enough info to debug why something failed.
+
 ## Delete and use fresh db
 
 If you get the db in a broken state and want to start from scratch:

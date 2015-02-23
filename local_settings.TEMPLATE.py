@@ -5,10 +5,10 @@ e = os.environ
 DATABASES = {
     'default': {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "HOST": e.get('BALEEN_DB_HOST', 'db_1'),
+        "PORT": e.get('BALEEN_DB_PORT', 5432),
         "NAME": e.get('BALEEN_DB_NAME', 'postgres'),
         "USER": e.get('POSTGRES_USER', 'postgres'),
-        "PORT": e.get('BALEEN_DB_PORT', 5432),
-        "HOST": e.get('BALEEN_DB_HOST', 'db_1'),
         "PASSWORD": e.get('POSTGRES_PASSWORD', ''),
     }
 }

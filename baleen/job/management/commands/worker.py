@@ -68,6 +68,12 @@ class Command(BaseCommand):
                 dest='build',
                 help="Take a directory with a baleen.yml and build it."
             ),
+            make_option('-k', '--keep',
+                default=None,
+                action='store_true',
+                dest='keep',
+                help="Use with --build, won't delete the project after building it."
+            ),
         )
 
     def _reset_jobs(self):
@@ -196,7 +202,7 @@ class Command(BaseCommand):
         signal(SIGINT, self.clean_up)
 
         if options['build']:
-            self.build(options['build'])
+            self.build(options['build'], keep_project=options['keep'])
             sys.exit(0)
         elif options['clear_jobs']:
             print "Removing all jobs in queue..."
@@ -213,7 +219,7 @@ class Command(BaseCommand):
         result = "Clearing job for job_id %d" % str(job_id)
         return result
 
-    def build(self, build_dir):
+    def build(self, build_dir, keep_project=False):
         p = None
         project_name = None
         counter = 1
@@ -268,7 +274,8 @@ class Command(BaseCommand):
             self.clear_current_action(msg)
             self._reset_jobs()
 
-        p.delete()
+        if not keep_project:
+            p.delete()
 
 
     def clear_current_action(self, msg=None):

@@ -9,7 +9,6 @@ from baleen.artifact.models import (
         output_types, ActionOutput
         )
 from baleen.action.ssh import RunCommandAction
-from baleen.action import ExpectedActionOutput
 
 from mock import patch, Mock
 
@@ -137,10 +136,6 @@ class JobTest(TestCase):
         self.assertEqual(self.job.success, False)
 
     def test_view_html_coverage(self):
-        ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
-                location='rightnow')
-        self.action.set_output(ea2)
-
         self.job.record_action_start(self.action)
         response = {
                 'output': {'CH': 'test'},
@@ -159,9 +154,6 @@ class JobTest(TestCase):
     def test_view_specific_html_coverage(self, m):
         from django.http import HttpResponse
         m.return_value = HttpResponse('test')
-        ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
-                location='rightnow')
-        self.action.set_output(ea2)
 
         self.job.record_action_start(self.action)
         response = {
@@ -258,9 +250,6 @@ class JobTemplateTagsTest(TestCase):
                 {'total': None,'success': None})
 
     def test_render_coverage(self):
-        ea = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_XML)
-        ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT)
-
         self.job.record_action_start(self.action)
         cover_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <cover line-rate="0.97"></cover>"""
@@ -277,11 +266,6 @@ class JobTemplateTagsTest(TestCase):
         self.assertEqual(97.0, ctxt['coverage_percent'])
 
     def test_render_coverage_with_html(self):
-        ea = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_XML)
-        ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
-                location='rightnow')
-        ea3 = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT)
-
         self.job.record_action_start(self.action)
         cover_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <cover line-rate="0.97"></cover>"""

@@ -104,9 +104,6 @@ class Action(object):
     def failure_message(self, action_result):
         return 'Action "%s" failed.' % (self.name,)
 
-    def set_output(self, output):
-        self.outputs[output.output_type] = output
-
     def as_form_data(self):
         data = {
                 'id': self.id,
@@ -114,13 +111,6 @@ class Action(object):
                 'project': self.project.id,
                 'index': self.index,
                 }
-        for output_type, output_full_name in output_types.DETAILS:
-            if output_type in output_types.IMPLICIT:
-                continue
-            data['output_' + output_type] = ''
-            o = self.outputs.get(output_type)
-            if o:
-                data['output_' + output_type] = o.location
         return data
 
     def values_without_keys(self):
@@ -161,6 +151,11 @@ class ActionPlan(object):
     def __iter__(self):
         return self
 
+    def append_step(self, details):
+        d_copy = dict(details)
+        d_copy['index'] = len(self.plan)
+        self.plan.append(d_copy)
+
     def next(self):
         self.current_index += 1
         try:
@@ -199,8 +194,6 @@ class DockerActionPlan(ActionPlan):
             return plan
 
         containers_to_build_and_test = build_data['build']
-        index=0
-        plan = []
         # Unnecessary since we always do a fresh clone now
         #plan.append(
             #{
@@ -214,16 +207,14 @@ class DockerActionPlan(ActionPlan):
         #index+=1
 
         for image_name, context in containers_to_build_and_test.iteritems():
-            plan.append({
+            self.append_step({
                'group': 'docker',
                'action': 'build_image',
                'name': 'Build docker image %s' % image_name,
-               'index': index,
                'image': image_name,
                'context': context,
                'project': self.project.name
             })
-            index += 1
 
         # in the case of any missing projects, the plan returned is one to
         # create/fetch/build one of the dependencies first.
@@ -233,41 +224,45 @@ class DockerActionPlan(ActionPlan):
         # hook waiting for them all.
 
         if build_data.get('test'):
-            plan.append({
+            self.append_step({
                        'group': 'docker',
                        'action': 'test_with_fig',
                        'name': 'Test with fig',
-                       'index': index,
                        'fig_data': build_data.get('test'), #'fig_test.yml',
                        'project': self.project.name,
                     })
-            index += 1
 
         for artifact_type, location in build_data.get('artifacts', {}).items():
             if not build_data.get('test'):
                 # TODO support doing a null run of a container and extracting
                 # artifacts from just the build process
                 raise Exception("artifacts key specified but no test!")
-            plan.append({
-                       'group': 'docker',
-                       'action': 'get_build_artifact',
-                       'project':  self.project.name,
-                       'name': 'Get build artifact ' + artifact_type,
-                       'index': index + 1,
-                       'artifact_type': artifact_type,
-                       'location': location
-                    })
-            index += 1
 
-        plan.append(
-                {
-                   'group': 'docker',
-                   'action': 'tag_good_image',
-                   'project':  self.project.name,
-                   'name': 'Tag successfully tested image as "latest"',
-                   'index': index
-                })
-        return plan
+            # Handle a "paths" key with an array of values, or a "path" key with
+            # a single value.
+            paths = []
+            if location.get('path'):
+                paths.append(location.get('path'))
+            for p in location.get('paths', []):
+                paths.append(p)
+
+            for p in paths: 
+                self.append_step({
+                           'group': 'docker',
+                           'action': 'get_build_artifact',
+                           'project':  self.project.name,
+                           'name': 'Get build artifact ' + artifact_type + ' ' + p,
+                           'artifact_type': artifact_type,
+                           'artifact_path': p 
+                        })
+
+        self.append_step({
+               'group': 'docker',
+               'action': 'tag_good_image',
+               'project':  self.project.name,
+               'name': 'Tag successfully tested image as "latest"',
+            })
+        return self.plan
 
     def dependencies_ok(self, dependencies):
         for d_name, d in dependencies.iteritems():
@@ -346,34 +341,3 @@ class DockerActionPlan(ActionPlan):
 
         #return dependent_project, plan
         return None, []
-
-
-class ExpectedActionOutput(object):
-    """ Define expected output from action.
-
-    All Actions produce stdout, stderr, and an exit code.
-
-    Linking ExpectedActionOutput allows for an action to also provide output
-    in files or by other mechanisms.
-
-    - 'output_type' is a constant from baleen.artifact.models.output_types
-      indicating the type of output.
-    - 'location' indicates where the output is available. It's meaning depends
-      on the action_type.
-      
-    """
-
-    def __init__(self, action, output_type, location=None):
-        self.action = action
-        self.output_type = output_type
-        self.location = location
-
-    def __unicode__(self):
-        return "Action '%s' expects %s output" % (
-                self.action.name,
-                self.get_output_type_display(), )
-
-    def get_output_type_display(self):
-        res = [x[1] for x in output_types.DETAILS if x[0] == self.output_type]
-        if res:
-            return res[0]

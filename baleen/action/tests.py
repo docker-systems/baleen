@@ -19,7 +19,6 @@ from baleen.action.docker import (
         )
 
 from baleen.action import (
-        ExpectedActionOutput,
         ActionPlan,
         DockerActionPlan
         )
@@ -112,23 +111,6 @@ build:
         self.assertTrue(h)
 
 
-class ExpectedActionOutputTest(TestCase):
-
-    def setUp(self):
-        self.project = Project(name='TestProject')
-        self.project.save()
-        self.action = RunCommandAction(project=self.project.name, index=0, name='TestAction',
-                username='foo', command='echo "blah"')
-
-    def test_unicode(self):
-        ea = ExpectedActionOutput(self.action, 'CH')
-        self.assertEqual(unicode(ea), "Action 'TestAction' expects Coverage HTML report output")
-
-    def test_output_type_display(self):
-        ea = ExpectedActionOutput(self.action, 'CH')
-        self.assertEqual(ea.get_output_type_display(), "Coverage HTML report")
-
-
 class BaseActionTest(TestCase):
 
     def setUp(self):
@@ -176,7 +158,6 @@ class RunCommandActionTest(BaseActionTest):
         keys = self.action.authorized_keys_entry
         self.assertTrue('no-agent-forwarding' in keys)
 
-        self.action.set_output(ExpectedActionOutput(self.action, output_types.XUNIT, 'here'))
         keys = self.action.authorized_keys_entry
         self.assertEqual(keys.split('\n')[0], '# TestAction')
 
@@ -192,10 +173,6 @@ class RunCommandActionTest(BaseActionTest):
         stdout = StringIO()
         stderr = StringIO()
         run_mock.return_value = {'code': 0}
-
-        self.action.execute(stdout, stderr, None)
-
-        ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT, location='xunit.xml')
 
         self.action.execute(stdout, stderr, None)
 

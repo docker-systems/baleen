@@ -271,7 +271,7 @@ class GetBuildArtifactAction(Action):
         self.artifact_type = kwarg.get('artifact_type')
 
     def __unicode__(self):
-        return "BuildImageAction: %s" % self.name
+        return "GetBuildArtifactAction: %s" % self.name
 
 
     def execute(self, stdoutlog, stderrlog, action_result):

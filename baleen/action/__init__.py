@@ -251,7 +251,7 @@ class DockerActionPlan(ActionPlan):
                            'group': 'docker',
                            'action': 'get_build_artifact',
                            'project':  self.project.name,
-                           'name': 'Get build artifact ' + artifact_type + ' ' + p,
+                           'name': 'Get %s build artifact: %s' % (artifact_type, p),
                            'artifact_type': artifact_type,
                            'artifact_path': p 
                         })

@@ -6,7 +6,6 @@ from baleen.artifact.models import (
         )
 from baleen.project.models import Project
 from baleen.action.ssh import RemoteSSHAction
-from baleen.action import ExpectedActionOutput
 from baleen.job.models import Job
 
 from mock import Mock, patch
@@ -87,11 +86,11 @@ class TestXUnitOutput(TestCase):
 
         self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
                 username='foo', command='echo "blah"')
+        self.action2 = RemoteSSHAction(project=self.project.name, index=0, name='TestAction2',
+                username='foo', command='echo "blah2"')
 
         self.job = Job(project=self.project, github_data='{}')
         self.job.save()
-
-        ea = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT)
 
         self.job.record_action_start(self.action)
         xunit_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -109,7 +108,14 @@ class TestXUnitOutput(TestCase):
                 }
         self.result = self.job.record_action_response(self.action, response)
         self.result.save()
-        self.xunit_result = XUnitOutput.objects.get(action_result__id=self.result.id)
+
+        self.xunit_result = XUnitOutput.objects.get(id=self.result.id)
+
+        self.job.record_action_start(self.action2)
+        self.result = self.job.record_action_response(self.action, response)
+        self.result.save()
+
+        self.xunit_result2 = XUnitOutput.objects.get(action_result__id=self.result.id)
 
     def test_get_xunit_failures(self):
         self.assertTrue('tests.UserPermissionsTest' in self.xunit_result.parse_xunit_failures())
@@ -118,22 +124,3 @@ class TestXUnitOutput(TestCase):
         success, total = self.xunit_result.parse_test_results()
         self.assertEqual(success, 3)
         self.assertEqual(total, 4)
-
-
-class TestExpectedOutput(TestCase):
-
-    def setUp(self):
-        self.project = Project(name='TestProject')
-        self.project.save()
-
-        self.action = RemoteSSHAction(project=self.project.name, index=0, name='TestAction',
-                username='foo', command='echo "blah"')
-
-        self.ea = ExpectedActionOutput(action=self.action, output_type=output_types.XUNIT,
-                location='righthere')
-
-        self.ea2 = ExpectedActionOutput(action=self.action, output_type=output_types.COVERAGE_HTML,
-                location='rightnow')
-
-    def test_unicode(self):
-        self.assertEqual(unicode(self.ea), u"Action 'TestAction' expects Xunit output")

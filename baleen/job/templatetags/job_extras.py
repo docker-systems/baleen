@@ -11,9 +11,22 @@ register = template.Library()
 
 @register.inclusion_tag('job/show_coverage.html')
 def render_coverage(c_xml, c_html):
+    """
+    Take an action result, and if it has an associated coverage xml/html output
+    the coverage percentage and a link.
+
+    If ar is a list, then it will take the first item.
+    
+    TODO split up handling lists and individual entries
+    """
     if not c_xml:
         return {}
 
+    from baleen.project.models import ActionResult
+    if not isinstance(c_xml, ActionResult):
+        c_xml = c_xml[0]
+    if c_html and not isinstance(c_html, ActionResult):
+        c_html = c_html[0]
     j = c_xml.job
 
     if c_xml.job.started_at:
@@ -55,13 +68,35 @@ def render_coverage(c_xml, c_html):
             }
 
 @register.inclusion_tag('job/xunit_summary.html')
-def render_xunit_summary(action_result):
+def render_xunit_summary(ar):
+    """
+    Take an action result, and if it has an associated xunit output, render
+    successes / total.
+
+    If ar is a list, then it will aggregate the the successes across all
+    action results with an associated xunit output.
+
+    TODO split up handling lists and individual entries
+    """
+    from baleen.project.models import ActionResult
+    # handle a single action_result, or aggregate across action results
+    if isinstance(ar, ActionResult):
+        action_results = [ar]
+    else:
+        action_results = ar
     try:
-        xunit_output = XUnitOutput.objects.get(action_result=action_result)
-        success, total = xunit_output.parse_test_results()
-    except XUnitOutput.DoesNotExist:
-        total = None
-        success = None
+        xunit_outputs = XUnitOutput.objects.filter(action_result__in=action_results)
+        if len(xunit_outputs) == 0:
+            success = None
+            total = None
+        else:
+            success = 0
+            total = 0
+
+        for xo in xunit_outputs:
+            s, t= xo.parse_test_results()
+            success += s
+            total += t
     except (ParseError, TypeError):
         success = '?'
         total = '?'
@@ -71,11 +106,12 @@ def render_xunit_summary(action_result):
 def render_xunit_failures(action_result):
     failures = []
     try:
-        xunit_output = XUnitOutput.objects.get(action_result=action_result)
-        dict_failures = xunit_output.parse_xunit_failures()
-        for cls, tests in dict_failures.items():
-            for test_name, details in tests.items():
-                failures.append((cls, test_name, details['message'], details['details']))
+        xunit_outputs = XUnitOutput.objects.filter(action_result=action_result)
+        for xo in xunit_outputs:
+            dict_failures = xo.parse_xunit_failures()
+            for cls, tests in dict_failures.items():
+                for test_name, details in tests.items():
+                    failures.append((cls, test_name, details['message'], details['details']))
     except (XUnitOutput.DoesNotExist, ParseError, TypeError):
         pass
     return { 'failure': failures }

@@ -240,21 +240,20 @@ class Job(models.Model):
         err_f = os.path.join(log_dir, '%s-%s-stderr.log' % (p.name, p.id))
         return out_f, err_f
 
-    def get_action_result_with_output(self, output_type):
-        action_output = ActionOutput.objects.filter(
-                    output_type=output_type,
-                    action_result__job=self
-                ).order_by('action_result__started_at').first()
-        if action_output:
-            return action_output.action_result
+    def get_action_results_with_output(self, output_type):
+        from baleen.project.models import ActionResult
+        return ActionResult.objects.filter(
+                actionoutput__output_type=output_type,
+                job=self
+                ).order_by('started_at')
 
     def test_action_result(self):
-        return self.get_action_result_with_output(output_types.XUNIT)
+        return self.get_action_results_with_output(output_types.XUNIT)
 
     def coverage_action_result(self):
         return (
-               self.get_action_result_with_output(output_types.COVERAGE_XML),
-               self.get_action_result_with_output(output_types.COVERAGE_HTML)
+               self.get_action_results_with_output(output_types.COVERAGE_XML),
+               self.get_action_results_with_output(output_types.COVERAGE_HTML)
                )
 
     @property

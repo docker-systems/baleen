@@ -267,11 +267,12 @@ class GetBuildArtifactAction(Action):
 
     def __init__(self, project, name, index, *arg, **kwarg):
         super(GetBuildArtifactAction, self).__init__(project, name, index)
-        self.artifact_path = kwarg.get('location', {}).get('path')
+        self.artifact_path = kwarg.get('artifact_path')
         self.artifact_type = kwarg.get('artifact_type')
 
     def __unicode__(self):
-        return "BuildImageAction: %s" % self.name
+        return "GetBuildArtifactAction: %s" % self.name
+
 
     def execute(self, stdoutlog, stderrlog, action_result):
         CONTAINER_NAME = self.job.stash['fig_test_container']
@@ -334,7 +335,7 @@ class TagGoodImageAction(Action):
         path = self.job.job_dirs['build']
         with cd(path):
             docker = subprocess.Popen(
-                ["docker", "tag",
+                ["docker", "tag", "--force",
                     self.job.stash['docker_image'] + ":" +
                     self.job.stash['docker_tag'],
                     self.job.stash['docker_image'] + ":latest",

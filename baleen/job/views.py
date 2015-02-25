@@ -19,9 +19,9 @@ def view_job(request, project_id, job_id):
     context = {
         'project': job.project,
         'job': job,
-        'xunit_result': job.get_action_result_with_output(output_types.XUNIT),
-        'coverage_xml_result': job.get_action_result_with_output(output_types.COVERAGE_XML),
-        'coverage_html_result': job.get_action_result_with_output(output_types.COVERAGE_HTML),
+        'xunit_result': job.get_action_results_with_output(output_types.XUNIT),
+        'coverage_xml_result': job.get_action_results_with_output(output_types.COVERAGE_XML),
+        'coverage_html_result': job.get_action_results_with_output(output_types.COVERAGE_HTML),
         'github_data': job.github_data if job.github_data else {}
     }
     context_instance=RequestContext(request)

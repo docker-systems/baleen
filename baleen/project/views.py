@@ -113,9 +113,9 @@ def show(request, project_id):
     for j in jobs:
         jobs_with_test_results.append((
             j,
-            j.get_action_result_with_output(output_types.XUNIT),
-            j.get_action_result_with_output(output_types.COVERAGE_XML),
-            j.get_action_result_with_output(output_types.COVERAGE_HTML)
+            j.get_action_results_with_output(output_types.XUNIT),
+            j.get_action_results_with_output(output_types.COVERAGE_XML),
+            j.get_action_results_with_output(output_types.COVERAGE_HTML)
             ))
 
     current_job = p.current_job()
@@ -123,9 +123,9 @@ def show(request, project_id):
         cj = current_job
         current_job = (
                 cj,
-                cj.get_action_result_with_output(output_types.XUNIT),
-                cj.get_action_result_with_output(output_types.COVERAGE_XML),
-                cj.get_action_result_with_output(output_types.COVERAGE_HTML)
+                cj.get_action_results_with_output(output_types.XUNIT),
+                cj.get_action_results_with_output(output_types.COVERAGE_XML),
+                cj.get_action_results_with_output(output_types.COVERAGE_HTML)
                 )
 
     context = {

@@ -1,3 +1,6 @@
-local_settings.py
 local_settings.TEMPLATE.py
 *.pyc
+fig.yml
+
+*_settings.py
+*_fig.yml

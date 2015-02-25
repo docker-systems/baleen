@@ -4,3 +4,8 @@ fig.yml
 
 *_settings.py
 *_fig.yml
+
+.git/
+
+*.un~
+*.swp

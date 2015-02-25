@@ -109,13 +109,13 @@ class TestXUnitOutput(TestCase):
         self.result = self.job.record_action_response(self.action, response)
         self.result.save()
 
-        self.xunit_result = XUnitOutput.objects.get(id=self.result.id)
+        self.xunit_result = XUnitOutput.objects.get(action_result=self.result)
 
         self.job.record_action_start(self.action2)
-        self.result = self.job.record_action_response(self.action, response)
-        self.result.save()
+        self.result2 = self.job.record_action_response(self.action2, response)
+        self.result2.save()
 
-        self.xunit_result2 = XUnitOutput.objects.get(action_result__id=self.result.id)
+        self.xunit_result2 = XUnitOutput.objects.get(action_result=self.result2)
 
     def test_get_xunit_failures(self):
         self.assertTrue('tests.UserPermissionsTest' in self.xunit_result.parse_xunit_failures())

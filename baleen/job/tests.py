@@ -109,7 +109,7 @@ class JobTest(TestCase):
         self.assertTrue('stdout' in result[0])
         self.assertTrue('stderr' in result[1])
 
-    def test_get_action_result_with_output(self):
+    def test_get_action_results_with_output(self):
         self.job.record_action_start(self.action)
         response = {
                 'stdout': 'blah',
@@ -119,9 +119,14 @@ class JobTest(TestCase):
         ao = ActionOutput(output='<xml></xml>', action_result=result, output_type=output_types.XUNIT)
         ao.save()
 
-
-        self.assertEqual(self.job.get_action_result_with_output(output_types.XUNIT), result)
-        self.assertEqual(self.job.get_action_result_with_output(output_types.COVERAGE_HTML), None)
+        self.assertItemsEqual(
+                self.job.get_action_results_with_output(output_types.XUNIT),
+                [result]
+                )
+        self.assertItemsEqual(
+                self.job.get_action_results_with_output(output_types.COVERAGE_HTML),
+                []
+                )
 
     def test_view_job(self):
         url = reverse('view_job', kwargs=dict(project_id=self.project.id, job_id=self.job.id))
@@ -260,8 +265,8 @@ class JobTemplateTagsTest(TestCase):
         self.result = self.job.record_action_response(self.action, response)
         self.result.save()
         ctxt = render_coverage(
-                self.job.get_action_result_with_output(output_types.COVERAGE_XML),
-                self.job.get_action_result_with_output(output_types.COVERAGE_HTML)
+                self.job.get_action_results_with_output(output_types.COVERAGE_XML),
+                self.job.get_action_results_with_output(output_types.COVERAGE_HTML)
                 )
         self.assertEqual(97.0, ctxt['coverage_percent'])
 
@@ -276,7 +281,7 @@ class JobTemplateTagsTest(TestCase):
         self.result = self.job.record_action_response(self.action, response)
         self.result.save()
         ctxt = render_coverage(
-                self.job.get_action_result_with_output(output_types.COVERAGE_XML),
-                self.job.get_action_result_with_output(output_types.COVERAGE_HTML)
+                self.job.get_action_results_with_output(output_types.COVERAGE_XML),
+                self.job.get_action_results_with_output(output_types.COVERAGE_HTML)
                 )
         self.assertTrue('index.html' in ctxt['coverage_html_url'])

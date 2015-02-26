@@ -1,6 +1,7 @@
 import subprocess
 import logging
 import os
+import re
 import yaml
 import tempfile
 
@@ -176,7 +177,8 @@ class TestWithFigAction(Action):
         # Set the FIG_PROJECT_NAME environment variable to build id
         # to avoid concurrent builds getting funky:
         # https://github.com/docker/fig/issues/748
-        os.environ['FIG_PROJECT_NAME'] = self.project.name + str(self.job.id)
+        sanitised_project_name = re.sub("-", "_", self.project.name)
+        os.environ['FIG_PROJECT_NAME'] = sanitised_project_name + str(self.job.id)
 
         self.job.stash['fig_project_name'] = os.environ['FIG_PROJECT_NAME']
         self.job.stash['fig_test_container'] = (

@@ -8,7 +8,7 @@ RUN echo "deb-src http://http.debian.net/debian jessie main\n" \
     "deb-src http://http.debian.net/debian jessie-updates main\n" \
     "deb-src http://security.debian.org jessie/updates main\n" \
     >> /etc/apt/sources.list
-RUN apt-get update && apt-get -y upgrade && echo 1
+RUN apt-get update && apt-get -y upgrade
 RUN apt-get install -y libexpat1-dev libidn11-dev python-pip git \
         libyaml-dev gearman gearman-job-server docker.io
 RUN apt-get build-dep -y psycopg2

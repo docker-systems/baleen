@@ -5,7 +5,10 @@
 {% endblock %}
 {% block content %}
     <div class="pull-right">
-    <a class="btn" href="{% url 'manual_deploy' project_id=project.id %}">Manual Deploy <i class="icon-play"></i></a>
+    <form action="{% url 'manual_deploy' project_id=project.id %}" method="post">
+        {% csrf_token %}
+        <button class="btn" name="foo" value="upvote">Manual Build <i class="icon-play"></i></button>
+    </form>
     {% if project.site_url %}
     <a class="btn" href="{{ project.site_url }}">Go to site <i class="icon-share"></i></a>
     {% endif %}

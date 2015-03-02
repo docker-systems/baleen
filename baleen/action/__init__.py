@@ -10,7 +10,6 @@ from StringIO import StringIO
 from contextlib import closing
 
 from baleen.utils import statsd_label_converter
-from baleen.artifact.models import output_types
 from baleen.project.models import Project, Hook
 
 

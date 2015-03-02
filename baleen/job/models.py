@@ -1,6 +1,9 @@
 import os
+import sys
+import traceback
 import json
 import gearman
+import logging
 import signal
 import requests
 
@@ -13,6 +16,8 @@ from baleen.artifact.models import ActionOutput, output_types
 from baleen.utils import mkdir_p
 
 from jsonfield import JSONField
+
+log = logging.getLogger('baleen.job')
 
 
 def manual_run(project, user=None):
@@ -115,7 +120,10 @@ class Job(models.Model):
         from baleen.project.models import ActionResult
         a = ActionResult.objects.get(action=action.name, index=action.index, job=self)
 
+        log.debug("Got matching action result %s" % str(a))
+
         a.status_code = response.get('code')
+        log.debug("Response status code is %s" % str(a.status_code))
         if a.status_code is None:
             if not response.get('success', True):
                 a.status_code = -1
@@ -127,24 +135,31 @@ class Job(models.Model):
             #raise Exception('Support hooks')
             pass
 
+        log.debug("Setting finished to timestamp now")
         a.finished_at = now()
 
         # Handle adding a summary message
         if not a.success:
+            log.debug("Creating failure message")
             a.message = action.failure_message(a)
+        log.debug("Adding response message to actionresult")
         a.message += (' ' + response.get('message', ''))
 
         if not a.success:
             # If a action belonging to this job fails, then the whole job is marked
             # unsuccessful
+            log.debug("No success so record job done.")
             self.record_done(success=False)
 
+        log.debug("Saving action result")
         a.save()
 
         for stdio, out_type in (('stderr', output_types.STDERR), ('stdout', output_types.STDOUT)):
             a_std, created = ActionOutput.objects.get_or_create(action_result=a, output_type=out_type)
             a_std.output=response.get(stdio,'')
+            log.debug("Got output %s and added to actionoutput" % stdio)
             a_std.save()
+            log.debug("Saved %s" % stdio)
 
         for output_type, the_output in response.get('output', {}).items():
             # Check we are expecting output for this action
@@ -185,13 +200,20 @@ class Job(models.Model):
             emails = [c['author']['email'] for c in commits]  # could use committer instead of author
             compare = self.github_data.get('compare')
             name = self.github_data.get('repository')['name']
-            requests.post(
-                settings.MAILGUN_URL,
-                auth=("api", settings.MAILGUN_KEY),
-                data={"from": settings.BALEEN_EMAIL,
-                      "to": emails,
-                      "subject": "Baleen is angry with you",
-                      "text": "One of these commits %s has broken %s!" % (compare, name)})
+            try:
+                requests.post(
+                    settings.MAILGUN_URL,
+                    auth=("api", settings.MAILGUN_KEY),
+                    data={"from": settings.BALEEN_EMAIL,
+                          "to": emails,
+                          "subject": "Baleen is angry with you",
+                          "text": "One of these commits %s has broken %s!" % (compare, name)})
+            except requests.exceptions.RequestException, e:
+                msg = "Exception while trying to notify of build failure via MailGun: " + str(sys.exc_info()[0])
+                msg += str(e)
+                log.error(msg)
+                traceback.print_tb(sys.exc_info()[2])
+
 
     @property
     def job_dirs(self):

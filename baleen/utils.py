@@ -3,13 +3,16 @@ import os
 import tarfile
 import errno
 import paramiko
+import json
 
+from urllib2 import Request, urlopen
 from hashlib import sha256
 from base64 import urlsafe_b64encode
 from contextlib import contextmanager
 from StringIO import StringIO
 
 from django.db import models
+from django.conf import settings
 
 
 def statsd_label_converter(name):
@@ -119,3 +122,25 @@ def full_path_split(path):
 
     folders.reverse()
     return folders
+
+
+def team_notify(room, msg, color='yellow'):
+    if getattr(settings, "HIPCHAT_TOKEN") is None:
+        return
+
+    # API V2, send message to room:
+    url = 'https://api.hipchat.com/v2/room/%d/notification' % room
+    headers = {
+        "content-type": "application/json",
+        "authorization": "Bearer %s" % settings.HIPCHAT_TOKEN}
+    datastr = json.dumps({
+        'message': msg,
+        'color': color,
+        'message_format': 'html',
+        'notify': False
+        })
+    request = Request(url, headers=headers, data=datastr)
+    uo = urlopen(request)
+    #rawresponse = ''.join(uo)
+    uo.close()
+    assert uo.code == 204

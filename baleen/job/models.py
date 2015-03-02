@@ -11,6 +11,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils.timezone import now
+from django.core.urlresolvers import reverse
 
 from baleen.artifact.models import ActionOutput, output_types
 from baleen.utils import mkdir_p
@@ -202,7 +203,7 @@ class Job(models.Model):
             name = self.github_data.get('repository')['name']
             try:
                 requests.post(
-                    settings.MAILGUN_URL,
+                    settings.MAILGUN_URL + '/messages',
                     auth=("api", settings.MAILGUN_KEY),
                     data={"from": settings.BALEEN_EMAIL,
                           "to": emails,
@@ -285,3 +286,11 @@ class Job(models.Model):
     @property
     def ordered_actions(self):
         return self.actionresult_set.order_by('started_at')
+
+    def get_absolute_url(self):
+        return reverse(
+                'baleen.job.views.view_job',
+                kwargs=dict(
+                    project_id=self.project.id,
+                    job_id=self.id
+                ))

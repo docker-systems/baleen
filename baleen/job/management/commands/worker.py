@@ -15,7 +15,7 @@ from django.core.management.base import BaseCommand
 from baleen.job.models import Job
 from baleen.project.models import ActionResult, Project
 from baleen.action.dispatch import get_action_object
-from baleen.utils import mkdir_p, cd
+from baleen.utils import team_notify
 
 import statsd
 from statsd.counter import Counter
@@ -99,6 +99,11 @@ class Command(BaseCommand):
                 #}
         }
 
+    def notify(self, msg, color='yellow'):
+        try:
+            team_notify('development', msg, color=color)
+        except Exception, e:
+            print 'Error on team_notify: ' + str(e)
 
     def run_task(self, worker, gm_job):
         try:
@@ -146,8 +151,6 @@ class Command(BaseCommand):
 
         self.current_baleen_job = job
 
-        print "Running job %s" % job_id
-
         # Only one job per project!  Until we have per-project queues,
         # just reject this job if there's already another one running
         # for the same project.
@@ -156,6 +159,8 @@ class Command(BaseCommand):
             job.reject()
             self._reset_jobs()
             return ''
+
+        print "Running job %s" % job_id
 
         # Get statsd connections
         project_t = Timer('baleen.%s.duration' % job.project.statsd_name)
@@ -169,17 +174,29 @@ class Command(BaseCommand):
         all_t.start()
         job.record_start(worker_pid)
 
-        sync_actions = job.checkout_repo_plan()
-        for action in sync_actions:
-            self._do_action(job, action, project_t)
+        try:
+            sync_actions = job.checkout_repo_plan()
+            for action in sync_actions:
+                self._do_action(job, action, project_t)
 
-        print "Finished sync with git"
+            print "Finished sync with git"
 
-        actions = job.project.action_plan()
-        for action in actions:
-            self._do_action(job, action, project_t)
+            actions = job.project.action_plan()
+            for action in actions:
+                self._do_action(job, action, project_t)
 
-        job.record_done()
+            job.record_done()
+        except Exception, e:
+            self.notify('Build for project <a href="%s">%s</a> failed' % (
+                job.get_absolute_url(), job.project.name),
+                color='red'
+                )
+            raise e
+
+        self.notify('Successful build for project <a href="%s">%s</a>' % (
+            job.get_absolute_url(), job.project.name),
+            color='green'
+            )
         all_t.stop()
         project_t.stop()
         counters['project']['success'] += 1

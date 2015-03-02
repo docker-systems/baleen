@@ -326,6 +326,8 @@ class GetBuildArtifactAction(Action):
 
             o = CoverageHTMLOutput(action_result=ar, output=p)
             o.save()
+        else:
+            log.warning("Unknown artifact type %s" % (artifact_type,))
 
 
 class TagGoodImageAction(Action):
@@ -358,5 +360,3 @@ class TagGoodImageAction(Action):
             'stderr': stderr,
             'code': status,
         }
-
-

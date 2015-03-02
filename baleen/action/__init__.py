@@ -74,12 +74,12 @@ class Action(object):
                 # Any exception that leaks from running the action has stuff recorded
                 # and is then raised to the caller
                 tb_str = traceback.format_exc(sys.exc_info()[2])
+                log.error("Got an exception %s: %s" % (str(e), tb_str))
                 job.record_action_response(self, {
                     'success': False,
                     'message': str(e),
                     'detail': tb_str 
                 })
-                log.error("Got an exception %s: %s" % (str(e), tb_str))
                 raise ActionFailure(e)
 
         job.record_action_response(self, response)

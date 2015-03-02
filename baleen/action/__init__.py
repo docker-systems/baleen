@@ -55,7 +55,7 @@ class Action(object):
 
     def run(self, job):
         self.job = job
-        log.info("Job %s - doing action: %s - %s" % (unicode(job.id), self.project.name, self.name))
+        log.info("Job %s - doing action: '%s - %s'" % (unicode(job.id), self.project.name, self.name))
 
         out_f, err_f = job.get_live_job_filenames()
 
@@ -81,6 +81,10 @@ class Action(object):
                     'detail': tb_str 
                 })
                 raise ActionFailure(e)
+
+        log.info("Job %s - completed action: '%s - %s' with code %s" % (
+            unicode(job.id), self.project.name, self.name, str(response.get('code', 'missing'))
+            ))
 
         job.record_action_response(self, response)
 

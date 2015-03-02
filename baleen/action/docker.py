@@ -162,10 +162,11 @@ class TestWithFigAction(Action):
         return "TestWithFigAction: %s" % self.name
 
     def write_fig_file(self, fig_data):
-        fd, identity_fn = tempfile.mkstemp()
+        fd, fig_fn = tempfile.mkstemp()
         with closing(os.fdopen(fd, 'w')) as ft:
             yaml.dump(fig_data, ft)
-        return identity_fn
+        log.debug('Wrote Fig test file to %s' % fig_fn)
+        return fig_fn
 
     def execute(self, stdoutlog, stderrlog, action_result):
         build_data = yaml.load(StringIO(self.job.build_definition))
@@ -197,6 +198,7 @@ class TestWithFigAction(Action):
         status = fig.returncode
         
         if status != 0:
+            log.debug('"fig up" returned %d' % status)
             return {
                 'stdout': stdout,
                 'stderr': stderr,
@@ -216,10 +218,12 @@ class TestWithFigAction(Action):
             stderr=subprocess.PIPE
             )
 
+        log.debug('Using "docker logs -f" to trace test process output')
         stdout, stderr = docker.communicate()
         status = docker.returncode
 
         if status != 0:
+            log.debug('"docker logs -f" returned %d' % status)
             return {
                 'stdout': stdout,
                 'stderr': stderr,
@@ -229,8 +233,8 @@ class TestWithFigAction(Action):
 
         stdout = stdout.decode('utf-8')
         stderr = stderr.decode('utf-8')
-        log.debug('Get test stdout: %s' % stdout)
-        log.debug('Get test stderr: %s' % stderr)
+        log.debug('docker log stdout: %s' % stdout)
+        log.debug('docker log stderr: %s' % stderr)
 
         # Get test container exit code
         docker2 = subprocess.Popen(
@@ -239,10 +243,12 @@ class TestWithFigAction(Action):
             stderr=subprocess.PIPE
             )
 
+        log.debug('Using "docker wait" to get return code of test process')
         stdout2, stderr2 = docker2.communicate()
         status = docker2.returncode
 
         if status != 0:
+            log.debug('"docker wait" returned %d' % status)
             return {
                 'stdout': stdout2,
                 'stderr': stderr2,
@@ -251,10 +257,11 @@ class TestWithFigAction(Action):
 
         stdout2 = stdout2.decode('utf-8')
         stderr2 = stderr2.decode('utf-8')
-        log.debug('Get test stdout: %s' % stdout2)
-        log.debug('Get test stderr: %s' % stderr2)
+        log.debug('docker wait stdout: %s' % stdout2)
+        log.debug('docker wait stderr: %s' % stderr2)
 
         status = int(stdout2)
+        log.debug('Result of fig test was status code %d' % status)
 
         del os.environ['FIG_PROJECT_NAME']
 

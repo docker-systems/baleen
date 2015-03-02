@@ -36,7 +36,7 @@
     </ul>
     {% endif %}
 
-    <p>Triggered by {{ job|render_initiating_user }}</p>
+    <p>Triggered by {{ job.instigator }}</p>
 
     {% if job.rejected %}
     <p class="text-error">Rejected. An earlier job for this project was still running at the time this job was received.</p>

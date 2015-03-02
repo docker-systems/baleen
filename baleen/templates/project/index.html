@@ -51,7 +51,7 @@
                 {% render_coverage job.coverage_action_result.0 job.coverage_action_result.1 %}
             </td>
             <td>
-                {{ job|render_initiating_user }}
+                {{ job.instigator }}
             </td>
             <td>
                 {{ job|job_status_badge }}

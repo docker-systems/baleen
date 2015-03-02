@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils.timezone import now
 from django.core.urlresolvers import reverse
+from django.utils.safestring import mark_safe
 
 from baleen.artifact.models import ActionOutput, output_types
 from baleen.utils import mkdir_p
@@ -278,6 +279,24 @@ class Job(models.Model):
                self.get_action_results_with_output(output_types.COVERAGE_XML),
                self.get_action_results_with_output(output_types.COVERAGE_HTML)
                )
+
+    @property
+    def instigator(self):
+        if self.manual_by:
+            return self.manual_by
+        elif self.github_data:
+            return self.github_data.get('pusher',{}).get('name','unknown')
+        else:
+            return 'unknown'
+
+    @property
+    def github_compare_url(self):
+        from baleen.job.templatetags.job_extras import render_commits
+        val = dict(
+                github_data_url=self.github_data.get('compare',''),
+                commits=render_commits(self),
+                )
+        return mark_safe('<a href="{github_data_url}">{commits}</a>'.format(**val))
 
     @property
     def current_action(self):

@@ -188,14 +188,21 @@ class Command(BaseCommand):
 
             job.record_done()
         except Exception, e:
-            self.notify('Build for project %s failed - %s (doh)' % (
-                job.project.name, settings.SITE_URL + job.get_absolute_url()),
+            self.notify('%s broke the build for %s - %s (doh) %s' % (
+                str(job.instigator),
+                job.project.name,
+                settings.SITE_URL + job.get_absolute_url(),
+                job.github_compare_url
+                ),
                 color='red'
                 )
             raise e
 
-        self.notify('Successful build for project %s - %s (excellent)' % (
-            job.project.name, settings.SITE_URL + job.get_absolute_url()),
+        self.notify('Successful build for %s - %s (excellent) nice one %s!' % (
+            job.project.name,
+            settings.SITE_URL + job.get_absolute_url(),
+            str(job.instigator)
+            ),
             color='green'
             )
         all_t.stop()

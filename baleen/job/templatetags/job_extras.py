@@ -129,20 +129,7 @@ def render_trigger(job):
     if job.manual_by:
         return 'manual deploy'
     elif job.github_data and not job.manual_by:
-        val = dict(
-                github_data_url=job.github_data.get('compare',''),
-                commits=render_commits(job),
-                )
-        return mark_safe('<a href="{github_data_url}">{commits}</a>'.format(**val))
-
-@register.filter()
-def render_initiating_user(job):
-    if job.manual_by:
-        return job.manual_by
-    elif job.github_data:
-        return job.github_data.get('pusher',{}).get('name','unknown')
-    else:
-        return 'unknown'
+        return job.github_compare_url
 
 @register.filter()
 def job_status_badge(job):

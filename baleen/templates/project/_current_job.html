@@ -17,7 +17,7 @@
         {{ job.0|render_trigger }}
     </div>
     <div class="span4">Who: 
-        {{ job.0|render_initiating_user }}
+        {{ job.0.instigator }}
     </div>
 </div>
 {% endwith %}

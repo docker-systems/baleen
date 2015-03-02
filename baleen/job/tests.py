@@ -177,7 +177,7 @@ class JobTest(TestCase):
 
 
 from baleen.job.templatetags.job_extras import (job_status_badge,
-        render_initiating_user, render_trigger, render_commits,
+        render_trigger, render_commits,
         render_xunit_summary, render_coverage)
 
 class JobTemplateTagsTest(TestCase):
@@ -213,15 +213,15 @@ class JobTemplateTagsTest(TestCase):
         self.job.save()
         self.assertTrue('failure' in job_status_badge(self.job))
 
-    def test_render_initiating_user(self):
-        self.assertEqual(render_initiating_user(self.job), 'unknown')
+    def test_instigator(self):
+        self.assertEqual(self.job.instigator, 'unknown')
         self.job.manual_by = self.user
         self.job.save()
-        self.assertEqual(render_initiating_user(self.job).username, 'bob')
+        self.assertEqual(self.job.instigator.username, 'bob')
         self.job.manual_by = None
         self.job.github_data = { 'pusher': {'name': 'mary'} }
         self.job.save()
-        self.assertEqual(render_initiating_user(self.job), 'mary')
+        self.assertEqual(self.job.instigator, 'mary')
 
     def test_render_trigger(self):
         self.assertEqual(render_trigger(self.job), None)

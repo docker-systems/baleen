@@ -124,19 +124,22 @@ def full_path_split(path):
     return folders
 
 
-def team_notify(room, msg, color='yellow'):
+def team_notify(msg, color='yellow', room=None):
     if getattr(settings, "HIPCHAT_TOKEN") is None:
         return
 
+    if room is None:
+        room = settings.HIPCHAT_ROOM
+
     # API V2, send message to room:
-    url = 'https://api.hipchat.com/v2/room/%d/notification' % room
+    url = 'https://api.hipchat.com/v2/room/%s/notification' % room
     headers = {
         "content-type": "application/json",
         "authorization": "Bearer %s" % settings.HIPCHAT_TOKEN}
     datastr = json.dumps({
         'message': msg,
         'color': color,
-        'message_format': 'html',
+        'message_format': 'text',
         'notify': False
         })
     request = Request(url, headers=headers, data=datastr)

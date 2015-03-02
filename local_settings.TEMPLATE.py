@@ -36,8 +36,10 @@ SECRET_KEY = ''
 GITHUB_HOOK_URL = SITE_URL
 BALEEN_EMAIL = "Baleen <baleen@example.com>"
 
-MAILGUN_KEY = '',
-MAILGUN_URL = '',
+HIPCHAT_TOKEN = None
+HIPCHAT_ROOM = 'development'
+MAILGUN_KEY = ''
+MAILGUN_URL = ''
 
 DOCKER_HOST = ''
 

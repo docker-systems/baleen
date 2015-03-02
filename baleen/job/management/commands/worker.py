@@ -101,7 +101,7 @@ class Command(BaseCommand):
 
     def notify(self, msg, color='yellow'):
         try:
-            team_notify('development', msg, color=color)
+            team_notify(msg, color=color)
         except Exception, e:
             print 'Error on team_notify: ' + str(e)
 
@@ -137,6 +137,7 @@ class Command(BaseCommand):
         self.current_action = None
 
         if response['code'] != 0:
+
             # If we got a non-zero exit status, then don't run any more actions
             raise Exception('Non-zero exit code')
 
@@ -187,14 +188,14 @@ class Command(BaseCommand):
 
             job.record_done()
         except Exception, e:
-            self.notify('Build for project <a href="%s">%s</a> failed' % (
-                job.get_absolute_url(), job.project.name),
+            self.notify('Build for project %s failed - %s (doh)' % (
+                job.project.name, settings.SITE_URL + job.get_absolute_url()),
                 color='red'
                 )
             raise e
 
-        self.notify('Successful build for project <a href="%s">%s</a>' % (
-            job.get_absolute_url(), job.project.name),
+        self.notify('Successful build for project %s - %s (excellent)' % (
+            job.project.name, settings.SITE_URL + job.get_absolute_url()),
             color='green'
             )
         all_t.stop()

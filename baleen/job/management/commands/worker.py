@@ -188,23 +188,10 @@ class Command(BaseCommand):
 
             job.record_done()
         except Exception, e:
-            self.notify('%s broke the build for %s - %s (doh) %s' % (
-                str(job.instigator),
-                job.project.name,
-                settings.SITE_URL + job.get_absolute_url(),
-                job.github_compare_url
-                ),
-                color='red'
-                )
+            self.notify(job.failure_message(), color='red')
             raise e
 
-        self.notify('Successful build for %s - %s (excellent) nice one %s!' % (
-            job.project.name,
-            settings.SITE_URL + job.get_absolute_url(),
-            str(job.instigator)
-            ),
-            color='green'
-            )
+        self.notify(job.success_message(), color='green')
         all_t.stop()
         project_t.stop()
         counters['project']['success'] += 1

@@ -292,11 +292,29 @@ class Job(models.Model):
     @property
     def github_compare_url(self):
         from baleen.job.templatetags.job_extras import render_commits
-        val = dict(
-                github_data_url=self.github_data.get('compare',''),
-                commits=render_commits(self),
-                )
-        return mark_safe('<a href="{github_data_url}">{commits}</a>'.format(**val))
+        if self.github_data:
+            val = dict(
+                    github_data_url=self.github_data.get('compare',''),
+                    commits=render_commits(self),
+                    )
+            return mark_safe('<a href="{github_data_url}">{commits}</a>'.format(**val))
+        else:
+            return ''
+
+    def success_message(self):
+        return 'Successful build for %s - %s (excellent) nice one %s!' % (
+            self.project.name,
+            settings.SITE_URL + self.get_absolute_url(),
+            str(self.instigator)
+            )
+
+    def failure_message(self):
+        return ('%s broke the build for %s - %s (doh) %s' % (
+                    str(self.instigator),
+                    self.project.name,
+                    settings.SITE_URL + self.get_absolute_url(),
+                    self.github_compare_url
+                )).strip()
 
     @property
     def current_action(self):

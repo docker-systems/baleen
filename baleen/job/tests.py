@@ -175,6 +175,24 @@ class JobTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(m.called)
 
+    def test_instigator(self):
+        self.assertEqual(self.job.instigator, 'unknown')
+        self.job.manual_by = self.user
+        self.job.save()
+        self.assertEqual(self.job.instigator.username, 'bob')
+        self.job.manual_by = None
+        self.job.github_data = { 'pusher': {'name': 'mary'} }
+        self.job.save()
+        self.assertEqual(self.job.instigator, 'mary')
+
+    def test_success_message(self):
+        self.assertRegexpMatches(self.job.success_message(),
+                r'Successful build for TestProject - https://deploy.example.com/project/\d+/job/\d+ \(excellent\) nice one unknown!')
+
+    def test_failure_message(self):
+        self.assertRegexpMatches(self.job.failure_message(),
+                'unknown broke the build for TestProject - https://deploy.example.com/project/\d+/job/\d+ \(doh\)')
+
 
 from baleen.job.templatetags.job_extras import (job_status_badge,
         render_trigger, render_commits,
@@ -212,16 +230,6 @@ class JobTemplateTagsTest(TestCase):
         self.job.rejected = False
         self.job.save()
         self.assertTrue('failure' in job_status_badge(self.job))
-
-    def test_instigator(self):
-        self.assertEqual(self.job.instigator, 'unknown')
-        self.job.manual_by = self.user
-        self.job.save()
-        self.assertEqual(self.job.instigator.username, 'bob')
-        self.job.manual_by = None
-        self.job.github_data = { 'pusher': {'name': 'mary'} }
-        self.job.save()
-        self.assertEqual(self.job.instigator, 'mary')
 
     def test_render_trigger(self):
         self.assertEqual(render_trigger(self.job), None)

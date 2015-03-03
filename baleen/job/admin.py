@@ -7,6 +7,6 @@ class ActionResultInline(admin.ModelAdmin):
     model = ActionResult
 
 class JobAdmin(admin.ModelAdmin):
-    #inlines = [ActionResultInline]
-    pass
+    date_hierarchy = 'started_at'
+    list_display = ('id', 'project', 'started_at', 'success')
 admin.site.register(Job, JobAdmin)

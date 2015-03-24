@@ -99,32 +99,32 @@ class BuildImageAction(Action):
         }
 
 
-class FigAction(Action):
+class ComposeAction(Action):
 
     def __init__(self, project, name, index, *arg, **kwarg):
-        super(FigAction, self).__init__(project, name, index)
-        self.fig_file = kwarg.get('fig_file')
+        super(ComposeAction, self).__init__(project, name, index)
+        self.compose_file = kwarg.get('compose_file')
 
     def __unicode__(self):
-        return "FigAction: %s" % self.name
+        return "ComposeAction: %s" % self.name
 
     def execute(self, stdoutlog, stderrlog, action_result):
         pass
 
 
-class TestWithFigAction(Action):
+class TestWithComposeAction(Action):
 
     def __init__(self, project, name, index, *arg, **kwarg):
-        super(TestWithFigAction, self).__init__(project, name, index)
-        self.fig_raw_data = kwarg.get('fig_data')
-        # fig_data looks like:
+        super(TestWithComposeAction, self).__init__(project, name, index)
+        self.compose_raw_data = kwarg.get('compose_data')
+        # compose_data looks like:
         #{'subject':
             #{
                 #'image':  "docker.domarino.com/api:baleen",
                 #'command': ['./run_tests.sh']
             #}
         #}
-        self.fig_data = yaml.load(StringIO(self.fig_raw_data))
+        self.compose_data = yaml.load(StringIO(self.compose_raw_data))
         self.volume_dir = None
 
     def _inject_baleen_data(self, data, credentials, stash):
@@ -159,46 +159,46 @@ class TestWithFigAction(Action):
         return data
 
     def __unicode__(self):
-        return "TestWithFigAction: %s" % self.name
+        return "TestWithComposeAction: %s" % self.name
 
-    def write_fig_file(self, fig_data):
-        fd, fig_fn = tempfile.mkstemp()
+    def write_compose_file(self, compose_data):
+        fd, compose_fn = tempfile.mkstemp()
         with closing(os.fdopen(fd, 'w')) as ft:
-            yaml.dump(fig_data, ft)
-        log.debug('Wrote Fig test file to %s' % fig_fn)
-        return fig_fn
+            yaml.dump(compose_data, ft)
+        log.debug('Wrote Compose test file to %s' % compose_fn)
+        return compose_fn
 
     def execute(self, stdoutlog, stderrlog, action_result):
         build_data = yaml.load(StringIO(self.job.build_definition))
 
-        fig_data_with_images = self._inject_baleen_data(self.fig_data,
+        compose_data_with_images = self._inject_baleen_data(self.compose_data,
                 build_data.get('credentials'),
                 self.job.stash
                 )
-        # Set the FIG_PROJECT_NAME environment variable to build id
+        # Set the COMPOSE_PROJECT_NAME environment variable to build id
         # to avoid concurrent builds getting funky:
-        # https://github.com/docker/fig/issues/748
+        # https://github.com/docker/compose/issues/748
         sanitised_project_name = re.sub("-", "_", self.project.name)
-        os.environ['FIG_PROJECT_NAME'] = sanitised_project_name + str(self.job.id)
+        os.environ['COMPOSE_PROJECT_NAME'] = sanitised_project_name + str(self.job.id)
 
-        self.job.stash['fig_project_name'] = os.environ['FIG_PROJECT_NAME']
-        self.job.stash['fig_test_container'] = (
-                os.environ['FIG_PROJECT_NAME']
+        self.job.stash['compose_project_name'] = os.environ['COMPOSE_PROJECT_NAME']
+        self.job.stash['compose_test_container'] = (
+                os.environ['COMPOSE_PROJECT_NAME']
                 + '_' + 'subject' + '_1' 
                 )
 
-        fn = self.write_fig_file(fig_data_with_images)
-        fig = subprocess.Popen(
-            ["fig", "-f", fn, "up", "-d"],
+        fn = self.write_compose_file(compose_data_with_images)
+        compose = subprocess.Popen(
+            ["docker-compose", "-f", fn, "up", "-d"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )
 
-        stdout, stderr = fig.communicate()
-        status = fig.returncode
+        stdout, stderr = compose.communicate()
+        status = compose.returncode
         
         if status != 0:
-            log.debug('"fig up" returned %d' % status)
+            log.debug('"compose up" returned %d' % status)
             return {
                 'stdout': stdout,
                 'stderr': stderr,
@@ -208,12 +208,12 @@ class TestWithFigAction(Action):
         # TODO: make collecting the test container logs a separate action
         stdout = stdout.decode('utf-8')
         stderr = stderr.decode('utf-8')
-        log.debug('Fig test stdout: %s' % stdout)
-        log.debug('Fig test stderr: %s' % stderr)
+        log.debug('Compose test stdout: %s' % stdout)
+        log.debug('Compose test stderr: %s' % stderr)
 
         # Get test container stdout/stderr
         docker = subprocess.Popen(
-            ["docker", "logs", "-f", self.job.stash['fig_test_container'] ],
+            ["docker", "logs", "-f", self.job.stash['compose_test_container'] ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )
@@ -238,7 +238,7 @@ class TestWithFigAction(Action):
 
         # Get test container exit code
         docker2 = subprocess.Popen(
-            ["docker", "wait", self.job.stash['fig_test_container'] ],
+            ["docker", "wait", self.job.stash['compose_test_container'] ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
             )
@@ -261,9 +261,9 @@ class TestWithFigAction(Action):
         log.debug('docker wait stderr: %s' % stderr2)
 
         status = int(stdout2)
-        log.debug('Result of fig test was status code %d' % status)
+        log.debug('Result of compose test was status code %d' % status)
 
-        del os.environ['FIG_PROJECT_NAME']
+        del os.environ['COMPOSE_PROJECT_NAME']
 
         return {
             'stdout': stdout,
@@ -284,7 +284,7 @@ class GetBuildArtifactAction(Action):
 
 
     def execute(self, stdoutlog, stderrlog, action_result):
-        CONTAINER_NAME = self.job.stash['fig_test_container']
+        CONTAINER_NAME = self.job.stash['compose_test_container']
         path = self.job.job_dirs['artifact']
         mkdir_p(path)
 

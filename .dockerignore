@@ -1,6 +1,8 @@
 local_settings.TEMPLATE.py
 *.pyc
 fig.yml
+docker-compose.yml
+.env
 
 production_settings.py
 local_settings.py

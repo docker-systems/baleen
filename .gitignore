@@ -5,6 +5,7 @@
 
 logs/*
 local_settings.py
+.env
 supervisorctl.conf
 htmlcov/*
 .coverage

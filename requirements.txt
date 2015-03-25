@@ -23,5 +23,5 @@ coverage
 pip>=1.4
 wheel
 watchdog
-fig
+docker-compose
 uwsgi

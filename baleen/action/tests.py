@@ -13,7 +13,7 @@ from mock import Mock, patch
 from baleen.action.ssh import RunCommandAction, FetchFileAction
 from baleen.action.project import CreateAction
 from baleen.action.docker import (
-        TestWithFigAction,
+        TestWithComposeAction,
         BuildImageAction,
         GetBuildArtifactAction
         )
@@ -249,24 +249,24 @@ class FetchFileActionTest(BaseActionTest):
                 '/var/lib/baleen/build_artifacts/rightnow'))
 
 
-class TestWithFigActionTest(BaseActionTest):
+class TestWithComposeActionTest(BaseActionTest):
 
     def setUp(self):
-        super(TestWithFigActionTest, self).setUp()
-        self.fig_raw_data = """
+        super(TestWithComposeActionTest, self).setUp()
+        self.compose_raw_data = """
 subject:
   image: "docker.domarino.com/api"
   command: ./run_tests.sh
 """
-        self.action = TestWithFigAction(project=self.project.name, index=0,
-                name='TestWithFigAction',
-                fig_data=self.fig_raw_data)
+        self.action = TestWithComposeAction(project=self.project.name, index=0,
+                name='TestWithComposeAction',
+                compose_data=self.compose_raw_data)
         self.credential = Credential(project=self.project, name="BLAH", value="hello")
         self.credential.save()
 
     def test_inject_baleen_data(self):
         injected_data = self.action._inject_baleen_data(
-                self.action.fig_data,
+                self.action.compose_data,
                 credentials= { "BLAH": "VALUE", "BLAH2": "FILE" },
                 stash = {
                     'docker_tag': 'womp',

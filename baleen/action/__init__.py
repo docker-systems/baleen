@@ -229,9 +229,9 @@ class DockerActionPlan(ActionPlan):
         if build_data.get('test'):
             self.append_step({
                        'group': 'docker',
-                       'action': 'test_with_fig',
-                       'name': 'Test with fig',
-                       'fig_data': build_data.get('test'), #'fig_test.yml',
+                       'action': 'test_with_compose',
+                       'name': 'Test with docker-compose',
+                       'compose_data': build_data.get('test'), #'compose_test.yml',
                        'project': self.project.name,
                     })
 

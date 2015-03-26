@@ -289,15 +289,17 @@ class Job(models.Model):
         else:
             return 'unknown'
 
-    @property
-    def github_compare_url(self):
+    def github_compare_url(self, html=True):
         from baleen.job.templatetags.job_extras import render_commits
         if self.github_data:
             val = dict(
                     github_data_url=self.github_data.get('compare',''),
                     commits=render_commits(self),
                     )
-            return mark_safe('<a href="{github_data_url}">{commits}</a>'.format(**val))
+            if html:
+                return mark_safe('<a href="{github_data_url}">{commits}</a>'.format(**val))
+            else:
+                return 'see changes at {github_data_url}'.format(**val)
         else:
             return ''
 
@@ -308,12 +310,12 @@ class Job(models.Model):
             str(self.instigator)
             )
 
-    def failure_message(self):
+    def failure_message(self, html=True):
         return ('%s broke the build for %s - %s (doh) %s' % (
                     str(self.instigator),
                     self.project.name,
                     settings.SITE_URL + self.get_absolute_url(),
-                    self.github_compare_url
+                    self.github_compare_url(html)
                 )).strip()
 
     @property

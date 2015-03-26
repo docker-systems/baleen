@@ -129,7 +129,7 @@ def render_trigger(job):
     if job.manual_by:
         return 'manual deploy'
     elif job.github_data and not job.manual_by:
-        return job.github_compare_url
+        return job.github_compare_url()
 
 @register.filter()
 def job_status_badge(job):

@@ -188,7 +188,7 @@ class Command(BaseCommand):
 
             job.record_done()
         except Exception, e:
-            self.notify(job.failure_message(), color='red')
+            self.notify(job.failure_message(html=False), color='red')
             raise e
 
         self.notify(job.success_message(), color='green')

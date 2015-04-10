@@ -175,10 +175,20 @@ class TestWithComposeAction(Action):
                 build_data.get('credentials'),
                 self.job.stash
                 )
+
+        # docker-compore does weird stuff with underscores, dashes, and/or capitals:
+        # https://github.com/docker/compose/issues/869
+        #
+        # e.g. iwmn-js would get turned into iwmnjs as a container name,
+        # without any freakin' warning.
+        # 
+        # strip these characters for now until docker and docker-compose agree
+        # on what docker container names should look like
+        sanitised_project_name = re.sub("[-_]", "", self.project.name.lower())
+
         # Set the COMPOSE_PROJECT_NAME environment variable to build id
         # to avoid concurrent builds getting funky:
         # https://github.com/docker/compose/issues/748
-        sanitised_project_name = re.sub("-", "_", self.project.name)
         os.environ['COMPOSE_PROJECT_NAME'] = sanitised_project_name + str(self.job.id)
 
         self.job.stash['compose_project_name'] = os.environ['COMPOSE_PROJECT_NAME']

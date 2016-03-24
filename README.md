@@ -62,7 +62,7 @@ You also need to setup a baleen config container. This allows you to provide
 your custom `local_settings.py` to the baleen container. To do so:
 
 ```
-cp local_settings.TEMPLATE.py local_settings.py`
+cp local_settings.TEMPLATE.py local_settings.py
 # Make any changes to local_settings.py you like
 cat local_settings.py | \
         docker run --volume /config -i --name baleen-config ubuntu \

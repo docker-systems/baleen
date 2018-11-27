@@ -1,10 +1,15 @@
+> **WARNING** - This project is currently abandoned and unmaintained.
+> It was an experiment for allowing integration testing across multiple docker containers when
+> nothing similar exists. The current generation of CI tools are a lot more docker aware,
+> so there is no one currently working on this project.
+
 # Baleen - Continuous Integration for your Docker stack
 
 "Filtering out the bad builds since 2014"
 
 http://en.wikipedia.org/wiki/Baleen
 
-WARNING: This is a work in progress and liable to change a lot over the next
+This is a work in progress and liable to change a lot over the next
 few months. Only work with this if you're interested in actively building
 an opinionated docker CI tool.
 
